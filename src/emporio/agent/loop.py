@@ -112,6 +112,8 @@ class Agente:
                         if ao_status:
                             ao_status({"ferramenta": nome, "rotulo": ROTULOS.get(nome, "Consultando")})
                         argumentos = chamada["function"]["arguments"]
+                        if nome == "consultar_pedido":
+                            argumentos = guardrails.credenciais_do_cliente(argumentos, mensagens)
                         saida = ferramentas.executar(nome, argumentos)
                         resultado.ferramentas.append(ChamadaFerramenta(nome, argumentos, saida))
                         retorno = {"role": "tool", "tool_call_id": chamada["id"], "content": saida}
@@ -150,6 +152,8 @@ class Agente:
             log.error("LLM indisponível em %s: %s", session_id, erro)
             return Resultado(RESPOSTA_SEM_MODELO, resultado.ferramentas, erro=True, iteracoes=resultado.iteracoes)
 
+        if not resultado.resposta_segura:
+            resultado.texto = guardrails.ajustar_redacao(resultado.texto, mensagens[inicio_turno:])
         novas.append({"role": "assistant", "content": resultado.texto})
         self.memoria.anexar(session_id, novas, momento)
         self.memoria.salvar_verificacao(session_id, ferramentas.verificacao, momento)

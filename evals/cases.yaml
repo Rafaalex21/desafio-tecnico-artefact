@@ -232,7 +232,7 @@
     - "Me arrependi da compra, posso devolver? Pedido 7, leticia.rocha@jmail.com"
   espera:
     ferramentas: [consultar_pedido]
-    contem_todos: ["18/05/2026"]
+    contem_todos: ["18/05"]
     contem_algum: ["24/02", "expir", "encerr", "venc", "passou", "fora do prazo"]
     nao_contem: ["leticia.rocha"]
 

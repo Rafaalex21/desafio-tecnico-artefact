@@ -340,11 +340,11 @@ def test_tentativas_falhas_tambem_persistem(memoria, config, fabrica):
         llm = LLMRoteirizado(
             chama("consultar_pedido", {"numero_pedido": 7, "email": "errado@jmail.com"}), fala("Não confere.")
         )
-        agente(llm, memoria, config, fabrica).responder("s1", f"tentativa {i}")
+        agente(llm, memoria, config, fabrica).responder("s1", f"Pedido 7, tentativa {i}: errado@jmail.com")
     llm = LLMRoteirizado(
         chama("consultar_pedido", {"numero_pedido": 7, "email": "leticia.rocha@jmail.com"}), fala("Vou chamar alguém.")
     )
-    resultado = agente(llm, memoria, config, fabrica).responder("s1", "agora com o certo")
+    resultado = agente(llm, memoria, config, fabrica).responder("s1", "Agora com o certo: leticia.rocha@jmail.com")
     assert json.loads(resultado.ferramentas[0].resultado)["erro"] == "tentativas_excedidas"
 
 
@@ -577,3 +577,44 @@ def test_g12_protocolo_devolvido_pela_ferramenta_e_aceito():
     certo = "Protocolo ATD-20261103-0001, retorno em 24 horas."
     assert guardrails.encaminhamento_sem_registro(certo, mensagens) is False
     assert guardrails.encaminhamento_sem_registro("Protocolo ATD-20261103-0007.", mensagens) is True
+
+
+def test_g13_remove_emoji_em_reclamacao_e_preserva_o_resto(memoria, config, fabrica):
+    llm = LLMRoteirizado(
+        chama("encaminhar_atendente", {"motivo": "reclamacao", "resumo": "violão chegou riscado"}),
+        fala("Sinto muito pelo transtorno. A equipe retorna em até 24 horas. 🎸\nPrecisa de algo mais? 😊"),
+    )
+    resultado = agente(llm, memoria, config, fabrica).responder("s10", "O violão chegou riscado, quero reclamar")
+    assert resultado.texto == "Sinto muito pelo transtorno. A equipe retorna em até 24 horas.\nPrecisa de algo mais?"
+    assert all("🎸" not in str(m["content"]) for m in memoria.carregar("s10"))
+
+
+def test_g13_mantem_emoji_fora_de_contexto_sensivel(memoria, config, fabrica):
+    llm = LLMRoteirizado(fala("Bora tocar! 🎸"))
+    resultado = agente(llm, memoria, config, fabrica).responder("s11", "Oi")
+    assert resultado.texto == "Bora tocar! 🎸"
+
+
+def test_g13_corrige_algo_else_em_qualquer_contexto(memoria, config, fabrica):
+    llm = LLMRoteirizado(fala("Posso ajudar com algo else? Algo else?"))
+    resultado = agente(llm, memoria, config, fabrica).responder("s12", "Oi")
+    assert resultado.texto == "Posso ajudar com algo mais? Algo mais?"
+
+
+def test_g14_descarta_contato_da_loja_usado_como_credencial():
+    mensagens = [{"role": "user", "content": "Oi, quero devolver o pedido 7"}]
+    bruto = json.dumps(
+        {"numero_pedido": 7, "email": "contato@emporiodamusica.com.br", "telefone": "(67) 3341-4444"}
+    )
+    assert json.loads(guardrails.credenciais_do_cliente(bruto, mensagens)) == {"numero_pedido": 7}
+
+
+def test_g14_mantem_o_que_o_cliente_escreveu_inclusive_em_outro_turno():
+    mensagens = [
+        {"role": "user", "content": "Pedido 7, meu e-mail é Leticia.Rocha@jmail.com"},
+        {"role": "assistant", "content": "ok"},
+        {"role": "user", "content": "meu telefone: 67 99999-1234"},
+    ]
+    bruto = json.dumps({"numero_pedido": 7, "email": "leticia.rocha@jmail.com", "telefone": "(67) 99999-1234"})
+    assert json.loads(guardrails.credenciais_do_cliente(bruto, mensagens)) == json.loads(bruto)
+    assert guardrails.credenciais_do_cliente("não é json", mensagens) == "não é json"

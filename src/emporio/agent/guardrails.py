@@ -1,6 +1,7 @@
 """Guardrails de entrada e saída (seção 9.2): G2 valores rastreáveis, G4 entrada, G5 raciocínio vazado,
 G6 promoção completa, G7 parcelamento simulado, G8 pedido sem consulta, G9 atraso sem oferta,
-G10 situação do produto, G11 datas rastreáveis e G12 encaminhamento registrado."""
+G10 situação do produto, G11 datas rastreáveis, G12 encaminhamento registrado, G13 tom e redação da resposta e
+G14 credenciais do cliente."""
 
 from __future__ import annotations
 
@@ -37,6 +38,8 @@ _ENCAMINHOU = re.compile(
     r"encaminhei|encaminhamos|\bregistrei\b|vou encaminhar|estou encaminhando|j[aá] (?:foi |est[aá] )?encaminhad",
     re.IGNORECASE,
 )
+_ALGO_ELSE = re.compile(r"\balgo else\b", re.IGNORECASE)  # tique do Qwen3-14B quantizado: "algo else"
+_EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿⬀-⯿️‍]+")
 _PARCELAMENTO = re.compile(r"(?i:parcel|prest[aã]|\bvezes\b|cart[aã]o)|\b\d{1,2}\s*x\b")
 
 
@@ -167,7 +170,8 @@ def aviso_de_promocao(faltas: list[str]) -> str:
     return (
         "[aviso do sistema] Ao citar um produto em promoção, a resposta precisa trazer juntos o preço original, "
         f"o percentual de desconto e o preço promocional. Faltou citar: {'; '.join(faltas)}. "
-        "Reescreva a resposta ao cliente sem mencionar este aviso."
+        "Reescreva a resposta à última pergunta do cliente, sem repetir a resposta anterior e sem mencionar "
+        "este aviso."
     )
 
 
@@ -343,6 +347,50 @@ AVISO_DE_ENCAMINHAMENTO = (
     "tenha devolvido um. Chame `encaminhar_atendente` agora (motivo `reclamacao` quando o cliente relata problema "
     "no produto) e informe apenas o protocolo e o prazo de retorno que ela devolver. Não mencione este aviso."
 )
+
+
+def contexto_sensivel(turno: list[dict[str, Any]]) -> bool:
+    """G13: reclamação encaminhada, entrega atrasada ou pedido cancelado, em que o manual pede tom sem emoji."""
+    if any(c["function"]["name"] == "encaminhar_atendente" for m in turno for c in m.get("tool_calls") or []):
+        return True
+    if entrega_atrasada_em(turno):
+        return True
+    return any(
+        m.get("role") == "tool" and re.search(r'"status":\s*"cancelled"', str(m.get("content") or "")) for m in turno
+    )
+
+
+def ajustar_redacao(texto: str, turno: list[dict[str, Any]]) -> str:
+    """G13: corrige "algo else" e, em contexto sensível, remove emojis, sem nova chamada ao modelo."""
+    texto = _ALGO_ELSE.sub(lambda m: "Algo mais" if m[0][0].isupper() else "algo mais", texto)
+    if contexto_sensivel(turno) and _EMOJI.search(texto):
+        texto = re.sub(r"[ \t]+(?=\n|$)", "", _EMOJI.sub("", texto)).rstrip()
+    return texto
+
+
+def credenciais_do_cliente(argumentos: str, mensagens: list[dict[str, Any]]) -> str:
+    """G14: `consultar_pedido` só recebe e-mail e telefone que o cliente escreveu na conversa.
+
+    O modelo já preencheu esses campos com o e-mail e o telefone da loja, tirados da ficha, o que gastaria uma
+    das tentativas de verificação do cliente com dados que não são dele.
+    """
+    try:
+        dados = json.loads(argumentos or "{}")
+    except json.JSONDecodeError:
+        return argumentos
+    if not isinstance(dados, dict):
+        return argumentos
+    falas = [str(m.get("content") or "") for m in mensagens if m.get("role") == "user"]
+    texto = " ".join(falas).casefold()
+    digitos = re.sub(r"\D", "", texto)
+    email, telefone = dados.get("email"), dados.get("telefone")
+    if email and str(email).strip().casefold() not in texto:
+        dados.pop("email")
+    if telefone:
+        numero = re.sub(r"\D", "", str(telefone))
+        if not numero or numero not in digitos:
+            dados.pop("telefone")
+    return json.dumps(dados, ensure_ascii=False)
 
 
 def reforco_de_resposta(texto: str, mensagens: list[dict[str, Any]], inicio_turno: int) -> str | None:

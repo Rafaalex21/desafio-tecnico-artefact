@@ -9,7 +9,7 @@ from openai import OpenAI
 
 from emporio.config import Settings, get_settings
 
-MAX_TOKENS = 800
+MAX_TOKENS = 3000
 TENTATIVAS_EXTRAS = 2
 
 
