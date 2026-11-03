@@ -56,7 +56,7 @@ class Memoria:
 
     def __post_init__(self) -> None:
         self.caminho.parent.mkdir(parents=True, exist_ok=True)
-        with self._conexao() as conexao:
+        with closing(self._conexao()) as conexao:
             conexao.executescript(DDL)
 
     def _conexao(self) -> sqlite3.Connection:

@@ -64,6 +64,7 @@ def simular_compra(
                 "id": produto_id,
                 "nome": produto["nome"],
                 "quantidade": quantidade,
+                "preco_tabela": fmt_brl(de_centavos(produto["price_cents"])),
                 "preco_unitario": fmt_brl(unitario),
                 "promocao_percentual": produto["promo_percent"],
                 "preco_unitario_pix": fmt_brl(unitario_pix),

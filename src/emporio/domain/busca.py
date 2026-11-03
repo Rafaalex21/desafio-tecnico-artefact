@@ -35,9 +35,7 @@ def _variantes(termo: str) -> list[str]:
 def pontuar(termo: str, alvo: str) -> float:
     """Maior entre `token_set_ratio` e `partial_ratio` do termo sobre o texto, já normalizado."""
     alvo_limpo = " ".join(re.sub(r"[^a-z0-9]+", " ", alvo).split())
-    return max(
-        max(fuzz.token_set_ratio(v, alvo_limpo), fuzz.partial_ratio(v, alvo_limpo)) for v in _variantes(termo)
-    )
+    return max(max(fuzz.token_set_ratio(v, alvo_limpo), fuzz.partial_ratio(v, alvo_limpo)) for v in _variantes(termo))
 
 
 def _preco(centavos: int) -> str:
@@ -63,9 +61,7 @@ def _categoria_canonica(conexao: sqlite3.Connection, informada: str) -> str:
     parecidas = [n for n in nomes if alvo and alvo in normalizar(n)]
     if len(parecidas) == 1:
         return parecidas[0]
-    raise ErroFerramenta(
-        "categoria_invalida", f"Categoria desconhecida: {informada!r}.", categorias_validas=nomes
-    )
+    raise ErroFerramenta("categoria_invalida", f"Categoria desconhecida: {informada!r}.", categorias_validas=nomes)
 
 
 def buscar_produtos(
@@ -104,9 +100,6 @@ def buscar_produtos(
         parametros.append(para_centavos(preco_max))
     if apenas_em_promocao:
         condicoes.append("promo_percent IS NOT NULL")
-    if not incluir_indisponiveis:
-        condicoes.append("disponibilidade = 'disponivel'")
-
     where = f"WHERE {' AND '.join(condicoes)}" if condicoes else ""
     linhas = conexao.execute(f"SELECT * FROM catalogo {where}", parametros).fetchall()
 
@@ -114,6 +107,16 @@ def buscar_produtos(
     if termo:
         pontos = {linha["product_id"]: pontuar(termo, linha["texto_busca"]) for linha in linhas}
         linhas = [linha for linha in linhas if pontos[linha["product_id"]] >= CORTE_BUSCA]
+
+    indisponiveis: list[sqlite3.Row] = []
+    if not incluir_indisponiveis:
+        indisponiveis = [linha for linha in linhas if linha["disponibilidade"] != "disponivel"]
+        linhas = [linha for linha in linhas if linha["disponibilidade"] == "disponivel"]
+        melhor_disponivel = max((pontos[linha["product_id"]] for linha in linhas), default=0.0)
+        indisponiveis = sorted(
+            (linha for linha in indisponiveis if pontos[linha["product_id"]] >= melhor_disponivel),
+            key=lambda r: (-pontos[r["product_id"]], r["product_id"]),
+        )[:ALTERNATIVAS_MAXIMAS]
 
     if ordenar_por == "relevancia":
         linhas.sort(key=lambda r: (-pontos[r["product_id"]], r["preco_final_cents"], r["product_id"]))
@@ -125,6 +128,10 @@ def buscar_produtos(
         "total_encontrado": len(linhas),
         "exibidos": len(exibidos),
         "categoria_sem_itens": categoria_sem_itens,
+        "indisponiveis_correspondentes": [
+            {"id": item["product_id"], "nome": item["nome"], "disponibilidade": item["disponibilidade"]}
+            for item in indisponiveis
+        ],
         "produtos": [
             {
                 "id": linha["product_id"],
