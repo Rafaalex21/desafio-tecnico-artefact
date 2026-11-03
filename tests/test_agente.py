@@ -356,3 +356,73 @@ def test_historico_longo_e_cortado_antes_de_ir_ao_modelo(memoria, config, fabric
     enviadas = llm.chamadas[0]
     assert len(enviadas) < 15 and enviadas[0]["role"] == "system" and enviadas[1]["role"] == "user"
     assert len(memoria.carregar("s1")) == 42
+
+
+# G6 e G7
+
+
+def _resultado_de_ferramenta(fabrica, nome: str, argumentos: dict[str, Any]) -> dict[str, Any]:
+    return {"role": "tool", "tool_call_id": "t", "content": fabrica("sessao-g6").executar(nome, json.dumps(argumentos))}
+
+
+def test_g6_promocao_sem_preco_original_e_percentual_e_apontada(fabrica):
+    ferramenta = _resultado_de_ferramenta(fabrica, "detalhes_produto", {"produto": "Kalani KAL-700T"})
+    promocoes = guardrails.promocoes_nas_ferramentas([ferramenta])
+    esperado = [(Decimal("359.00"), Decimal(10), Decimal("323.10"))]
+    assert [(p.original, p.percentual, p.final) for p in promocoes] == esperado
+
+    faltas = guardrails.promocao_incompleta("Sai por R$ 323,10 em até 4x.", promocoes)
+    assert len(faltas) == 2 and "R$ 359,00" in faltas[0] and "10%" in faltas[1]
+    assert guardrails.promocao_incompleta("De R$ 359,00 por R$ 323,10, 10% de desconto.", promocoes) == []
+    assert guardrails.promocao_incompleta("A loja abre às 9h.", promocoes) == []
+
+
+def test_g6_simulacao_tambem_traz_a_promocao(fabrica):
+    detalhes = json.loads(fabrica("s").executar("detalhes_produto", json.dumps({"produto": "Kalani KAL-700T"})))
+    carrinho = {"produtos": [{"id": detalhes["id"], "quantidade": 1}]}
+    simulacao = _resultado_de_ferramenta(fabrica, "simular_compra", carrinho)
+    promocoes = guardrails.promocoes_nas_ferramentas([simulacao])
+    assert [(p.original, p.final) for p in promocoes] == [(Decimal("359.00"), Decimal("323.10"))]
+
+
+def test_g6_corrige_uma_vez_e_nao_persiste_o_rascunho(memoria, config, fabrica):
+    llm = LLMRoteirizado(
+        chama("detalhes_produto", {"produto": "Kalani KAL-700T"}),
+        fala("Ele sai por R$ 323,10."),
+        fala("De R$ 359,00 por R$ 323,10, com 10% de desconto."),
+    )
+    resultado = agente(llm, memoria, config, fabrica).responder("s1", "Quanto custa o Kalani KAL-700T?")
+    assert resultado.texto == "De R$ 359,00 por R$ 323,10, com 10% de desconto."
+    assert resultado.reforcos == 1 and not resultado.resposta_segura
+    assert "preço original" in llm.chamadas[-1][-1]["content"]
+    assert all("Ele sai por" not in str(m["content"]) for m in memoria.carregar("s1"))
+
+
+def test_g6_nao_insiste_se_o_modelo_repete_a_resposta(memoria, config, fabrica):
+    llm = LLMRoteirizado(
+        chama("detalhes_produto", {"produto": "Kalani KAL-700T"}),
+        fala("Ele sai por R$ 323,10."),
+        fala("Ele sai por R$ 323,10."),
+    )
+    resultado = agente(llm, memoria, config, fabrica).responder("s2", "Quanto custa o Kalani KAL-700T?")
+    assert resultado.texto == "Ele sai por R$ 323,10." and resultado.reforcos == 1
+
+
+def test_g7_parcelamento_sem_simulacao_pede_simular_compra(memoria, config, fabrica):
+    detalhes = json.loads(fabrica("s").executar("detalhes_produto", json.dumps({"produto": "Takamine GD20"})))
+    llm = LLMRoteirizado(
+        chama("detalhes_produto", {"produto": "Takamine GD20"}),
+        fala("Posso simular, em qual cidade você está?"),
+        chama("simular_compra", {"produtos": [{"id": detalhes["id"], "quantidade": 1}]}, "c2"),
+        fala("Dá para parcelar o Takamine GD20 em 12x de R$ 183,25."),
+    )
+    resultado = agente(llm, memoria, config, fabrica).responder("s3", "Em quantas vezes parcela o Takamine GD20?")
+    assert resultado.texto == "Dá para parcelar o Takamine GD20 em 12x de R$ 183,25."
+    assert [c.nome for c in resultado.ferramentas] == ["detalhes_produto", "simular_compra"]
+    assert resultado.reforcos == 1
+
+
+def test_g7_nao_age_sem_conversa_de_parcelas(memoria, config, fabrica):
+    llm = LLMRoteirizado(chama("detalhes_produto", {"produto": "Takamine GD20"}), fala("Ele custa R$ 2.199,00."))
+    resultado = agente(llm, memoria, config, fabrica).responder("s4", "Quanto custa o Takamine GD20?")
+    assert resultado.reforcos == 0 and resultado.texto == "Ele custa R$ 2.199,00."

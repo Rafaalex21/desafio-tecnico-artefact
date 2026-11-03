@@ -46,6 +46,7 @@ class Resultado:
     latencia_ms: int = 0
     iteracoes: int = 0
     correcoes_g2: int = 0
+    reforcos: int = 0
     resposta_segura: bool = False
     erro: bool = False
 
@@ -93,8 +94,10 @@ class Agente:
             usuario,
         ]
         novas: list[dict[str, Any]] = [usuario]
+        inicio_turno = len(mensagens) - 1
         resultado = Resultado("")
         corrigido = False
+        reforcado = False
 
         try:
             for iteracao in range(1, MAX_ITERACOES + 1):
@@ -120,8 +123,14 @@ class Agente:
                 permitidos = guardrails.valores_permitidos(mensagens)
                 invalidos = guardrails.valores_nao_rastreaveis(texto, permitidos)
                 if texto and not invalidos:
-                    resultado.texto = texto
-                    break
+                    ajuste = None if reforcado else guardrails.reforco_de_resposta(texto, mensagens, inicio_turno)
+                    if ajuste is None:
+                        resultado.texto = texto
+                        break
+                    reforcado = True
+                    resultado.reforcos += 1
+                    mensagens += [{"role": "assistant", "content": texto}, {"role": "user", "content": ajuste}]
+                    continue
                 if corrigido:
                     log.warning("G2: resposta segura em %s; valores %s; texto %r", session_id, invalidos, texto)
                     resultado.texto, resultado.resposta_segura = guardrails.RESPOSTA_SEGURA, True
