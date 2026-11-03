@@ -12,7 +12,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError, model_validator
 
 from emporio.clock import agora
 from emporio.config import Settings, get_settings
@@ -28,6 +28,18 @@ def _como_texto(valor: Any) -> Any:
 
 class _Entrada(BaseModel):
     model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _descartar_vazios(cls, dados: Any) -> Any:
+        """Modelos locais preenchem opcionais com "", null ou 0; isso vale como campo ausente."""
+        if not isinstance(dados, dict):
+            return dados
+        return {
+            chave: valor
+            for chave, valor in dados.items()
+            if valor is not None and valor != "" and not (chave == "numero_pedido" and valor == 0)
+        }
 
 
 class BuscarProdutos(_Entrada):
@@ -86,9 +98,9 @@ class ConsultarPoliticas(_Entrada):
 
 
 class EncaminharAtendente(_Entrada):
-    """Registra o caso para a equipe humana e devolve o protocolo.
+    """Registra o caso para a equipe humana e devolve o protocolo e o prazo de retorno.
 
-    Use só depois de explicar o encaminhamento ao cliente.
+    Use em reclamação, pedido atrasado, pedido de falar com uma pessoa ou caso que as regras não cobrem.
     """
 
     motivo: Literal["reclamacao", "pedido_atrasado", "solicitacao_do_cliente", "fora_das_regras", "outro"]

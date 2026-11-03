@@ -292,7 +292,8 @@ def test_pedido_7_entregue_com_prazos_de_pos_venda(ferramentas: Ferramentas):
     eleg = pedido["elegibilidade"]
     assert eleg["arrependimento"]["elegivel"] is False and eleg["arrependimento"]["prazo_final"] == "24/02/2026"
     assert eleg["troca_por_defeito"]["elegivel"] is False and eleg["troca_por_defeito"]["prazo_final"] == "05/03/2026"
-    assert eleg["garantia_legal"] == {"elegivel": True, "prazo_final": "18/05/2026", "dias_restantes": 54}
+    assert eleg["garantia_legal"]["elegivel"] is True and eleg["garantia_legal"]["dias_restantes"] == 54
+    assert eleg["garantia_legal"]["prazo_final"] == "18/05/2026"
 
 
 def test_pedido_aceita_telefone_no_lugar_do_email(ferramentas: Ferramentas):

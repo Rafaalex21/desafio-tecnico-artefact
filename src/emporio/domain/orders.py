@@ -111,11 +111,15 @@ def _fmt_data(valor: date | str) -> str:
 
 def _direito(marco: date, dias: int, hoje: date) -> dict[str, Any]:
     prazo = marco + timedelta(days=dias)
-    return {
-        "elegivel": hoje <= prazo,
-        "prazo_final": _fmt_data(prazo),
-        "dias_restantes": max(0, (prazo - hoje).days),
-    }
+    elegivel = hoje <= prazo
+    restantes = max(0, (prazo - hoje).days)
+    if not elegivel:
+        situacao = f"Prazo encerrado em {_fmt_data(prazo)}"
+    elif restantes == 0:
+        situacao = f"Dentro do prazo, que termina hoje ({_fmt_data(prazo)})"
+    else:
+        situacao = f"Dentro do prazo até {_fmt_data(prazo)} ({restantes} dias restantes)"
+    return {"elegivel": elegivel, "prazo_final": _fmt_data(prazo), "dias_restantes": restantes, "situacao": situacao}
 
 
 def elegibilidade(data_compra: str, recebimento: str, hoje: date) -> dict[str, Any]:

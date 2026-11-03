@@ -129,16 +129,28 @@ def test_telefone_recusa_numero_diferente_ou_incompleto(informado: str):
 
 def test_pedido_7_em_25_de_marco():
     resultado = elegibilidade("2026-02-03", "2026-02-17", date(2026, 3, 25))
-    assert resultado["arrependimento"] == {"elegivel": False, "prazo_final": "24/02/2026", "dias_restantes": 0}
+    assert resultado["arrependimento"] == {
+        "elegivel": False,
+        "prazo_final": "24/02/2026",
+        "dias_restantes": 0,
+        "situacao": "Prazo encerrado em 24/02/2026",
+    }
     assert resultado["troca_por_preferencia"]["elegivel"] is False
-    assert resultado["troca_por_defeito"] == {"elegivel": False, "prazo_final": "05/03/2026", "dias_restantes": 0}
-    assert resultado["garantia_legal"] == {"elegivel": True, "prazo_final": "18/05/2026", "dias_restantes": 54}
+    assert resultado["troca_por_defeito"]["situacao"] == "Prazo encerrado em 05/03/2026"
+    assert resultado["garantia_legal"] == {
+        "elegivel": True,
+        "prazo_final": "18/05/2026",
+        "dias_restantes": 54,
+        "situacao": "Dentro do prazo até 18/05/2026 (54 dias restantes)",
+    }
 
 
 def test_prazo_vale_ate_o_ultimo_dia_inclusive():
     no_ultimo_dia = elegibilidade("2026-03-01", "2026-03-10", date(2026, 3, 17))
     um_dia_depois = elegibilidade("2026-03-01", "2026-03-10", date(2026, 3, 18))
-    assert no_ultimo_dia["arrependimento"] == {"elegivel": True, "prazo_final": "17/03/2026", "dias_restantes": 0}
+    assert no_ultimo_dia["arrependimento"]["elegivel"] is True
+    assert no_ultimo_dia["arrependimento"]["dias_restantes"] == 0
+    assert "termina hoje" in no_ultimo_dia["arrependimento"]["situacao"]
     assert um_dia_depois["arrependimento"]["elegivel"] is False
 
 
