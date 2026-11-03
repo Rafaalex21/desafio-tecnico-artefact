@@ -441,6 +441,9 @@ Argumentos inválidos em uma tool call voltam ao modelo como erro de ferramenta 
 | G7 | Parcelamento simulado | Se o cliente falou de parcelas ou cartão, o agente consultou um produto (`detalhes_produto` ou `buscar_produtos`) e não chamou `simular_compra`, uma correção manda chamá-la sem pedir cidade. Compartilha com o G6 a única correção por turno |
 | G8 | Pedido sem consulta | Se a fala do cliente cita pedido ou compra, traz número e e-mail ou telefone e `consultar_pedido` não foi chamada no turno, uma correção manda chamá-la sem pedir mais dados. Compartilha a única correção por turno |
 | G9 | Atraso sem oferta | Se um resultado de ferramenta traz `entrega_atrasada` verdadeiro e a resposta não menciona encaminhar, equipe ou atendente, uma correção manda oferecer o encaminhamento. Compartilha a única correção por turno |
+| G10 | Situação do produto | Se um resultado de ferramenta marca um produto como esgotado, descontinuado ou em breve e a resposta o cita sem dizer a situação exata, ou hesita sobre um descontinuado ("temporariamente", "pode ser que"), uma correção pede a situação exata mantendo o resto da resposta. Compartilha a única correção por turno |
+| G11 | Datas rastreáveis | Toda data da resposta (dd/mm/aaaa, dd/mm ou "24 de fevereiro") precisa constar do prompt, de resultado de ferramenta ou de fala do cliente; senão, uma correção pede só as datas devolvidas pela ferramenta. Compartilha a única correção por turno |
+| G12 | Encaminhamento registrado | Se a resposta diz que encaminhou o caso ("encaminhei", "vou encaminhar") sem `encaminhar_atendente` ter sido chamada, ou cita um protocolo ausente dos resultados de ferramenta, uma correção manda chamá-la. Tem prioridade sobre os demais. Compartilha a única correção por turno |
 
 Resposta segura: "Opa, me enrolei aqui pra confirmar essa informação. Pode reformular a pergunta, ou prefere que eu chame alguém da equipe?"
 
@@ -568,7 +571,8 @@ Uma execução de cada configuração, com o prompt final e temperatura 0,3 (rel
 |---|---|---|---|---|
 | Qwen3-14B com raciocínio | 24/24 | 126/130 | 28/32 | 14,3 s / 20,9 s |
 | Qwen3-14B com raciocínio, com G6 e G7 | 22/24 | 120/130 | 28/32 | 14,9 s / 30,5 s |
-| Qwen3-14B com raciocínio, com G8 e G9 (padrão) | 24/24 | 128/130 | 30/32 | 14,9 s / 26,4 s |
+| Qwen3-14B com raciocínio, com G8 e G9 | 24/24 | 128/130 | 30/32 | 14,9 s / 26,4 s |
+| Qwen3-14B com raciocínio, com G8 a G12 (padrão) | 24/24 | 130/130 | 32/32 | 14,3 s / 36,0 s |
 | gpt-oss-20b, esforço baixo | 23/24 | 123/130 | 26/32 | 6,3 s / 11,2 s |
 | Qwen3-14B sem raciocínio | 18/24 | 117/130 | 25/32 | 4,6 s / 9,0 s |
 

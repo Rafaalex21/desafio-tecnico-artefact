@@ -484,3 +484,96 @@ def test_g9_atraso_sem_oferta_pede_encaminhamento(memoria, config, fabrica):
     resultado = agente(llm, memoria, config, fabrica).responder("s6", pergunta)
     assert resultado.texto.endswith("à equipe?") and resultado.reforcos == 1
     assert "encaminhe o caso" in llm.chamadas[-1][-1]["content"]
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("Prazo encerrado em 24/02/2026.", {(24, 2)}),
+        ("Até 5 de março e 18/05.", {(5, 3), (18, 5)}),
+        ("Funciona das 09:00 às 18:00, 3x sem juros, 1/2 dúzia.", set()),
+    ],
+)
+def test_g11_reconhece_datas_nos_tres_formatos(texto, esperado):
+    assert guardrails.datas_em(texto) == esperado
+
+
+def test_g11_data_inventada_pede_reescrita(memoria, config, fabrica):
+    llm = LLMRoteirizado(
+        chama("consultar_pedido", {"numero_pedido": 7, "email": "leticia.rocha@jmail.com"}),
+        fala("O prazo de arrependimento encerrou em 24 de fevereiro, mas a troca vai até 17 de março."),
+        fala("O prazo de arrependimento encerrou em 24/02/2026."),
+    )
+    pergunta = "Quero devolver, pedido 7, leticia.rocha@jmail.com"
+    resultado = agente(llm, memoria, config, fabrica).responder("s7", pergunta)
+    assert resultado.texto == "O prazo de arrependimento encerrou em 24/02/2026." and resultado.reforcos == 1
+    assert "17/03" in llm.chamadas[-1][-1]["content"]
+
+
+def test_g11_data_do_ferramenta_ou_do_cliente_nao_dispara():
+    mensagens = [
+        {"role": "user", "content": "Comprei dia 03/02"},
+        {"role": "tool", "content": json.dumps({"prazo_final": "24/02/2026"})},
+    ]
+    assert guardrails.datas_nao_rastreaveis("Comprou em 3 de fevereiro; prazo até 24/02/2026.", mensagens) == []
+
+
+def test_g10_situacao_vaga_pede_o_estado_exato(memoria, config, fabrica):
+    llm = LLMRoteirizado(
+        chama("buscar_produtos", {"consulta": "Shelby SN-7C"}),
+        fala("O Shelby SN-7C não está disponível no momento, talvez esgotado."),
+        fala("O Shelby SN-7C foi descontinuado e não faz mais parte do catálogo."),
+    )
+    resultado = agente(llm, memoria, config, fabrica).responder("s8", "Vocês têm o Shelby SN-7C?")
+    assert resultado.texto.startswith("O Shelby SN-7C foi descontinuado") and resultado.reforcos == 1
+    assert "descontinuado" in llm.chamadas[-1][-1]["content"]
+
+
+def test_g10_nao_age_se_o_produto_nao_e_citado():
+    produto = {"nome": "Shelby SN-7C 7 Cordas Nylon Natural", "disponibilidade": "descontinuado"}
+    mensagens = [{"role": "tool", "content": json.dumps({"indisponiveis_correspondentes": [produto]})}]
+    assert guardrails.situacao_imprecisa("Temos o Yamaha C40 por R$ 599,90.", mensagens) == []
+    assert guardrails.situacao_imprecisa("O SN-7C está descontinuado.", mensagens) == []
+    assert guardrails.situacao_imprecisa("O SN‑7C está fora de estoque.", mensagens) != []
+
+
+def test_g10_hesitacao_sobre_produto_descontinuado_tambem_e_corrigida():
+    produto = {"nome": "Shelby SN-7C 7 Cordas Nylon Natural", "disponibilidade": "descontinuado"}
+    mensagens = [{"role": "tool", "content": json.dumps({"indisponiveis_correspondentes": [produto]})}]
+    vago = "O SN-7C está temporariamente indisponível e foi descontinuado."
+    assert guardrails.situacao_imprecisa(vago, mensagens) != []
+    assert guardrails.situacao_imprecisa("O SN-7C saiu de linha, descontinuado.", mensagens) == []
+
+
+def test_g12_protocolo_inventado_manda_chamar_encaminhar_atendente(memoria, config, fabrica):
+    llm = LLMRoteirizado(
+        fala("Sinto muito. Já enviamos um protocolo (nº 20261103-001) e a equipe retorna em 24 horas."),
+        chama("encaminhar_atendente", {"motivo": "reclamacao", "resumo": "violão chegou riscado"}),
+        fala("Sinto muito pelo transtorno. Seu protocolo está registrado, a equipe retorna em até 24 horas."),
+    )
+    resultado = agente(llm, memoria, config, fabrica).responder("s9", "O violão chegou riscado, quero reclamar")
+    assert [c.nome for c in resultado.ferramentas] == ["encaminhar_atendente"] and resultado.reforcos == 1
+    assert "encaminhar_atendente" in llm.chamadas[1][-1]["content"]
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("Vou encaminhar seu caso à equipe.", True),
+        ("Quer que eu encaminhe o caso à equipe?", False),
+        ("Nosso protocolo de troca tem 30 dias.", False),
+        ("Seu protocolo é ATD-20261103-0001.", True),
+    ],
+)
+def test_g12_sem_chamada_da_ferramenta(texto, esperado):
+    assert guardrails.encaminhamento_sem_registro(texto, []) is esperado
+
+
+def test_g12_protocolo_devolvido_pela_ferramenta_e_aceito():
+    mensagens = [
+        {"role": "assistant", "tool_calls": [{"id": "c", "function": {"name": "encaminhar_atendente"}}]},
+        {"role": "tool", "content": json.dumps({"protocolo": "ATD-20261103-0001"})},
+    ]
+    certo = "Protocolo ATD-20261103-0001, retorno em 24 horas."
+    assert guardrails.encaminhamento_sem_registro(certo, mensagens) is False
+    assert guardrails.encaminhamento_sem_registro("Protocolo ATD-20261103-0007.", mensagens) is True

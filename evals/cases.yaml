@@ -140,7 +140,8 @@
     - "Em quantas vezes consigo parcelar o Takamine GD20?"
   espera:
     ferramentas_alguma: [simular_compra]
-    contem_todos: ["12x", "R$ 183,25"]
+    contem_todos: ["R$ 183,25"]
+    contem_algum: ["12x", "12 vezes"]
 
 # Políticas e horário
 

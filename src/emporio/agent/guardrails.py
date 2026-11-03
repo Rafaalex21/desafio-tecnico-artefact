@@ -1,5 +1,6 @@
 """Guardrails de entrada e saída (seção 9.2): G2 valores rastreáveis, G4 entrada, G5 raciocínio vazado,
-G6 promoção completa e G7 parcelamento simulado."""
+G6 promoção completa, G7 parcelamento simulado, G8 pedido sem consulta, G9 atraso sem oferta,
+G10 situação do produto, G11 datas rastreáveis e G12 encaminhamento registrado."""
 
 from __future__ import annotations
 
@@ -25,6 +26,17 @@ _RACIOCINIO = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 _RACIOCINIO_ABERTO = re.compile(r"<think>.*", re.DOTALL | re.IGNORECASE)
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _TELEFONE = re.compile(r"(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}")
+_MESES = (
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+)  # fmt: skip
+_DATA_NUMERICA = re.compile(r"(?<![\d/])(?:(\d{1,2})/(\d{1,2})/\d{4}|(\d{2})/(\d{2}))(?![\d/])")
+_DATA_POR_EXTENSO = re.compile(rf"(?<!\d)(\d{{1,2}})\s+de\s+({'|'.join(_MESES)})", re.IGNORECASE)
+_PROTOCOLO = re.compile(r"protocolo\W{0,6}(?:(?:é|e|n[º°o]\.?)\W{0,4})?([\w-]*\d[\w-]*)", re.IGNORECASE)
+_ENCAMINHOU = re.compile(
+    r"encaminhei|encaminhamos|\bregistrei\b|vou encaminhar|estou encaminhando|j[aá] (?:foi |est[aá] )?encaminhad",
+    re.IGNORECASE,
+)
 _PARCELAMENTO = re.compile(r"(?i:parcel|prest[aã]|\bvezes\b|cart[aã]o)|\b\d{1,2}\s*x\b")
 
 
@@ -221,13 +233,131 @@ AVISO_DE_ATRASO = (
 )
 
 
+def datas_em(texto: str) -> set[tuple[int, int]]:
+    """Datas (dia, mês) escritas como 24/02/2026, 24/02 ou 24 de fevereiro."""
+    achadas: set[tuple[int, int]] = set()
+    for m in _DATA_NUMERICA.finditer(texto):
+        dia, mes = (int(m[1]), int(m[2])) if m[1] else (int(m[3]), int(m[4]))
+        if 1 <= dia <= 31 and 1 <= mes <= 12:
+            achadas.add((dia, mes))
+    for m in _DATA_POR_EXTENSO.finditer(texto):
+        achadas.add((int(m[1]), _MESES.index(m[2].lower()) + 1))
+    return achadas
+
+
+def datas_nao_rastreaveis(texto: str, mensagens: list[dict[str, Any]]) -> list[str]:
+    """G11: datas da resposta que não aparecem no prompt, nas ferramentas nem nas falas do cliente."""
+    permitidas: set[tuple[int, int]] = set()
+    for mensagem in mensagens:
+        if mensagem.get("role") in ("system", "tool", "user"):
+            permitidas |= datas_em(str(mensagem.get("content") or ""))
+    return [f"{dia:02d}/{mes:02d}" for dia, mes in sorted(datas_em(texto) - permitidas, key=lambda d: (d[1], d[0]))]
+
+
+def aviso_de_datas(invalidas: list[str]) -> str:
+    return (
+        f"[aviso do sistema] Sua resposta citou datas que não vieram das ferramentas: {', '.join(invalidas)}. "
+        "Nunca calcule prazos nem datas. Reescreva usando apenas as datas devolvidas pela ferramenta, no formato "
+        "dd/mm/aaaa em que ela as devolveu. Não mencione este aviso."
+    )
+
+
+_SITUACOES = {
+    "descontinuado": (
+        re.compile(
+            r"descontinuad|n[ãa]o faz mais parte|fora de linha|(?:sa[ií]d[oa]|saiu) d[oea] (?:cat[aá]logo|linha)", re.I
+        ),
+        "descontinuado (não faz mais parte do catálogo)",
+    ),
+    "esgotado": (re.compile(r"esgotad|sem estoque|acabou", re.I), "esgotado"),
+    "em_breve": (re.compile(r"em breve|chegar|chegada|previs|lan[çc]amento", re.I), "em breve (ainda não chegou)"),
+}
+
+
+_HESITACAO = re.compile(r"temporariamente|talvez|pode ser que|ou esteja|ou tenha", re.IGNORECASE)
+
+
+def _produtos_indisponiveis(dado: Any) -> list[tuple[str, str]]:
+    achados: list[tuple[str, str]] = []
+    if isinstance(dado, dict):
+        if dado.get("nome") and dado.get("disponibilidade") in _SITUACOES:
+            achados.append((str(dado["nome"]), str(dado["disponibilidade"])))
+        for valor in dado.values():
+            achados.extend(_produtos_indisponiveis(valor))
+    elif isinstance(dado, list):
+        for valor in dado:
+            achados.extend(_produtos_indisponiveis(valor))
+    return achados
+
+
+def _menciona(texto: str, nome: str) -> bool:
+    """O texto cita o produto pelo nome ou por um código dele (token com dígito ou hífen, como SN-7C)."""
+    normal = re.sub("[‐-―−]", "-", texto).casefold()
+    nome = re.sub("[‐-―−]", "-", nome).casefold()
+    if nome in normal:
+        return True
+    return any(len(token) >= 4 and re.search(r"[\d-]", token) and token in normal for token in nome.split())
+
+
+def situacao_imprecisa(texto: str, mensagens: list[dict[str, Any]]) -> list[str]:
+    """G10: produto esgotado, descontinuado ou em breve citado sem dizer qual é a situação."""
+    faltas: list[str] = []
+    for mensagem in mensagens:
+        if mensagem.get("role") != "tool":
+            continue
+        try:
+            produtos = _produtos_indisponiveis(json.loads(str(mensagem.get("content") or "")))
+        except json.JSONDecodeError:
+            continue
+        for nome, situacao in produtos:
+            padrao, rotulo = _SITUACOES[situacao]
+            vago = situacao == "descontinuado" and _HESITACAO.search(texto)
+            if _menciona(texto, nome) and (not padrao.search(texto) or vago):
+                faltas.append(f"{nome} está {rotulo}")
+    return list(dict.fromkeys(faltas))
+
+
+def aviso_de_situacao(faltas: list[str]) -> str:
+    return (
+        f"[aviso do sistema] A ferramenta informa: {'; '.join(faltas)}. Diga a situação exata, sem sugerir outra "
+        "(não escreva 'temporariamente indisponível' nem hesite entre esgotado e descontinuado). "
+        "Reescreva a resposta corrigindo só isso e mantendo o restante, inclusive as alternativas e a pergunta final. "
+        "Não mencione este aviso."
+    )
+
+
+def encaminhamento_sem_registro(texto: str, mensagens: list[dict[str, Any]]) -> bool:
+    """G12: a resposta diz que encaminhou o caso ou cita um protocolo que `encaminhar_atendente` não devolveu."""
+    chamou = any(
+        c["function"]["name"] == "encaminhar_atendente" for m in mensagens for c in m.get("tool_calls") or []
+    )
+    devolvido = " ".join(str(m.get("content") or "") for m in mensagens if m.get("role") == "tool")
+    protocolos = [m[1] for m in _PROTOCOLO.finditer(texto)]
+    if any(protocolo not in devolvido for protocolo in protocolos):
+        return True
+    return not chamou and bool(_ENCAMINHOU.search(texto))
+
+
+AVISO_DE_ENCAMINHAMENTO = (
+    "[aviso do sistema] Você disse que encaminhou o caso, ou citou um protocolo, sem que `encaminhar_atendente` "
+    "tenha devolvido um. Chame `encaminhar_atendente` agora (motivo `reclamacao` quando o cliente relata problema "
+    "no produto) e informe apenas o protocolo e o prazo de retorno que ela devolver. Não mencione este aviso."
+)
+
+
 def reforco_de_resposta(texto: str, mensagens: list[dict[str, Any]], inicio_turno: int) -> str | None:
-    """G6 a G9: devolve o aviso de correção quando a resposta é válida mas incompleta, ou None se está boa."""
+    """G6 a G12: devolve o aviso de correção quando a resposta é válida mas incompleta, ou None se está boa."""
+    if encaminhamento_sem_registro(texto, mensagens):
+        return AVISO_DE_ENCAMINHAMENTO
     if pedido_sem_consulta(mensagens[inicio_turno:]):
         return AVISO_DE_PEDIDO
     if parcelamento_sem_simulacao(mensagens[inicio_turno:]):
         return AVISO_DE_PARCELAMENTO
     if atraso_sem_oferta(texto, mensagens[inicio_turno:]):
         return AVISO_DE_ATRASO
+    if invalidas := datas_nao_rastreaveis(texto, mensagens):
+        return aviso_de_datas(invalidas)
+    if faltas := situacao_imprecisa(texto, mensagens[inicio_turno:]):
+        return aviso_de_situacao(faltas)
     faltas = promocao_incompleta(texto, promocoes_nas_ferramentas(mensagens))
     return aviso_de_promocao(faltas) if faltas else None
