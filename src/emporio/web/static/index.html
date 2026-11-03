@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Riff · Empório da Música</title>
+  <meta name="description" content="Converse com o Riff, assistente virtual da Empório da Música.">
+  <link rel="icon" href="/static/riff.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Source+Sans+3:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topo">
+      <img class="avatar" src="/static/riff.svg" alt="" width="44" height="44">
+      <div class="marca">
+        <h1>Empório da Música</h1>
+        <p class="sub"><span class="nome">Riff</span> · assistente virtual</p>
+      </div>
+      <span class="selo" id="selo" data-estado="carregando" title="Situação da loja agora">Verificando a loja</span>
+      <button class="botao-fantasma" id="bastidores" type="button" aria-pressed="false" title="Mostrar as consultas feitas em cada resposta">Bastidores</button>
+      <button class="botao-fantasma" id="nova" type="button">Nova conversa</button>
+    </header>
+
+    <p class="aviso" id="aviso" role="status" hidden></p>
+
+    <main class="mensagens" id="mensagens" role="log" aria-live="polite" aria-label="Conversa com o Riff"></main>
+
+    <footer class="rodape">
+      <form id="form" autocomplete="off">
+        <label class="so-leitor" for="texto">Mensagem para o Riff</label>
+        <textarea id="texto" rows="1" maxlength="2000" placeholder="Pergunte ao Riff" enterkeyhint="send"></textarea>
+        <button class="enviar" id="enviar" type="submit" aria-label="Enviar mensagem">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10l12 2-12 2z" fill="currentColor"/></svg>
+        </button>
+      </form>
+      <p class="dica">Enter envia, Shift+Enter quebra a linha.</p>
+    </footer>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

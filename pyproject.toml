@@ -19,6 +19,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "pytest",
     "ruff",
 ]
@@ -39,6 +40,7 @@ packages = ["src/emporio"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+filterwarnings = ["ignore::pytest.PytestUnhandledThreadExceptionWarning"]
 
 [tool.ruff]
 line-length = 120

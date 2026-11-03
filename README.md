@@ -145,7 +145,7 @@ O manual da loja descreve o tom desejado como informal, mas profissional, compar
 
 A interface principal é uma tela de chat em HTML, CSS e JavaScript sem etapa de compilação, servida pelo próprio FastAPI. Durante o processamento, a tela exibe em tempo real qual consulta o agente está realizando ("consultando o catálogo", "verificando o pedido"), por meio de eventos enviados pelo servidor (SSE). Streamlit, Chainlit e Gradio foram descartados por oferecerem menos controle sobre a identidade visual, que se quis próxima à de um aplicativo de assistente. A linha de comando permanece como ferramenta de desenvolvimento, com modo de depuração que expõe cada chamada de ferramenta.
 
-A resposta final não é transmitida token a token, porque precisa ser validada integralmente antes de exibida (seção 3.5). A tela compensa a espera com o indicador de atividade e uma animação de entrada do texto.
+A resposta final não é transmitida token a token, porque precisa ser validada integralmente antes de exibida (seção 3.5). A tela compensa a espera com o indicador de atividade e uma animação de entrada do texto. A conversa é restaurada pelo identificador de sessão guardado no navegador, inclusive quando a página é recarregada no meio de um turno: o servidor conclui e grava a resposta, e a tela a exibe quando ela fica pronta. O botão "Bastidores" mostra, em cada resposta, as ferramentas chamadas e seus argumentos. O servidor escuta apenas no endereço local e não tem autenticação, o que é adequado a um protótipo executado na própria máquina.
 
 ### 3.8 Persistência do histórico
 
@@ -246,6 +246,7 @@ As limitações abaixo decorrem do prazo, das lacunas dos dados ou de escolhas c
 | Feriados | O cálculo de loja aberta os ignora (S8) | Calendário nacional, de Mato Grosso do Sul e de Campo Grande pela biblioteca `holidays` |
 | Frete para outras cidades | O agente informa modalidades e prazos, mas não valores | Integração com tabela de fretes por CEP |
 | Encaminhamento a humanos | Gravado em arquivo local | Integração com ferramenta de tickets ou com o WhatsApp da loja |
+| Interface web | Sem autenticação nem limite de requisições, com escuta restrita ao endereço local; um turno por vez em cada sessão | Autenticação, limite de requisições e fila de turnos para uso em rede |
 | Verificação de identidade | Número do pedido com e-mail ou telefone, verificação fraca aceitável para um protótipo | Número de WhatsApp autenticado ou código de uso único |
 | Afirmações qualitativas | O verificador automático cobre valores monetários; afirmações sobre disponibilidade dependem do prompt e da avaliação | Verificação estruturada da resposta contra os resultados das ferramentas |
 | Viés da avaliação | Casos escritos pelo próprio autor, que conhecia as armadilhas dos dados | Casos coletados de atendimentos reais e avaliação de tom por um modelo juiz |

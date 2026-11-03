@@ -7,7 +7,7 @@ Versão 1.0, 03/11/2026. Este documento é a fonte da verdade do projeto. O cód
 Este projeto segue desenvolvimento orientado a especificação. Cada sessão de implementação:
 
 1. Lê este documento inteiro na primeira vez e, nas seguintes, ao menos as seções citadas pela etapa (seção 15).
-2. Implementa uma etapa por vez, na ordem E0 a E8. Uma etapa só termina quando todos os critérios de aceite passam.
+2. Implementa uma etapa por vez, na ordem E0 a E9. Uma etapa só termina quando todos os critérios de aceite passam.
 3. Faz commits pequenos ao longo da etapa (Conventional Commits, em português). O commit sugerido na etapa é o último dela, não o único.
 4. Atualiza o painel de acompanhamento ao iniciar e ao concluir a etapa.
 
@@ -15,7 +15,7 @@ Este projeto segue desenvolvimento orientado a especificação. Cada sessão de 
 
 - URL: https://claude.ai/artifact/6oEL4jWJ5AG53KhBo7DENK
 - Atualização pela ferramenta `ArtifactData`, sempre lendo antes (`get`) e escrevendo com `if_version`.
-- Coleção `etapas`, documentos `E0` a `E8`. Campos que a sessão altera:
+- Coleção `etapas`, documentos `E0` a `E9`. Campos que a sessão altera:
   - `status`: `pendente` | `em_andamento` | `concluida` | `bloqueada`
   - `tarefas`: lista de `{texto, feito}`; marque `feito: true` à medida que concluir. A lista inteira é reescrita em cada `update`.
   - `atualizado_em` (ISO 8601 com fuso) e `atualizado_por: "claude"`.
@@ -34,7 +34,7 @@ Use a skill `anthropic-skills:github-security-audit` nos seguintes momentos:
 - antes de criar o repositório no GitHub;
 - antes do primeiro push;
 - antes de qualquer push que adicione arquivos de dados, configuração ou scripts novos;
-- na entrega final (etapa E8).
+- na entrega final (etapa E9).
 
 Além da skill:
 
@@ -69,7 +69,7 @@ A Empório da Música é uma loja fictícia de instrumentos musicais em Campo Gr
 | R3 | Saber quando consultar dados e quando consultar políticas | Seções 7 e 8.3 |
 | R4 | Lidar com perguntas fora do escopo | Seção 8.4 |
 | R5 | Python como linguagem principal | Todo o projeto |
-| R6 | README com execução, justificativas, limitações e uso de IA | Etapa E8 |
+| R6 | README com execução, justificativas, limitações e uso de IA | Etapa E9 |
 | R7 | 3 a 5 conversas de exemplo, ao menos uma não trivial | Etapa E7 |
 | R8 | Repositório público com histórico real de commits | Seção 0.2 |
 
@@ -459,10 +459,12 @@ Resposta segura: "Opa, me enrolei aqui pra confirmar essa informação. Pode ref
 | Rota | Descrição |
 |---|---|
 | `GET /` | Tela de chat (estático) |
-| `POST /api/chat` | Corpo `{session_id, message}`. Resposta `text/event-stream` com eventos `status` `{ferramenta, rotulo}`, `message` `{content, ferramentas, latencia_ms}`, `error` `{mensagem}`, `done` |
+| `POST /api/chat` | Corpo `{session_id, message}`. Resposta `text/event-stream` com eventos `status` `{ferramenta, rotulo}`, `message` `{content, ferramentas: [{nome, argumentos}], latencia_ms, erro}`, `error` `{mensagem}`, `done` |
 | `GET /api/sessions/{id}/messages` | Mensagens visíveis (usuário e assistente) para restaurar a tela |
 | `GET /api/loja` | `{aberta, texto}` para o selo do cabeçalho |
 | `GET /api/health` | `{llm: "ok" | "erro", modelo}` |
+
+O resultado das ferramentas não é enviado à tela; só nomes e argumentos, para o modo "bastidores". O servidor escuta em 127.0.0.1 por padrão e processa um turno por vez em cada sessão. Se a página for recarregada durante um turno, a tela consulta `GET /api/sessions/{id}/messages` até a resposta aparecer.
 
 A resposta final é validada (G2) antes de ser enviada, por isso não há streaming token a token; a tela anima a entrada do texto no cliente. Os eventos `status` mostram em tempo real o que o agente está consultando.
 
@@ -601,7 +603,7 @@ Scripts em `pyproject.toml`: `emporio-etl`, `emporio-chat`, `emporio-web`, `empo
 
 ## 15. Etapas de implementação
 
-Executor padrão: Claude Code com Sonnet 5.5 em esforço alto. Estimativas somam cerca de 11 h no dia 1 e 8,5 h no dia 2. Prioridades: P0 obrigatório, P1 esperado, P2 se sobrar tempo.
+Executor padrão: Claude Code com Sonnet 5.5 em esforço alto. Estimativas somam cerca de 11 h no dia 1 e 9,5 h no dia 2. Prioridades: P0 obrigatório, P1 esperado, P2 se sobrar tempo.
 
 ### E0. Fundação do repositório e do modelo local (dia 1, 1h30, P0)
 Seções: 0, 2, 12, 14.
@@ -681,7 +683,18 @@ Seções: 0.3, 12, 13.2.
 Aceite: os 5 arquivos existem e refletem execuções reais, sem edição manual das respostas.
 Commit final: `docs(exemplos): conversas geradas com data de referência fixa`.
 
-### E8. README final e entrega (dia 2, 1h30, P0)
+### E8. Teste end-to-end e revisão do projeto (dia 2, 1h, P0)
+Seções: 11, 13.
+- Usar a skill `e2e-first-testing` (Playwright como mecanismo principal) para exercitar o produto pronto, a partir da tela de chat.
+- Fluxos mínimos: abertura com boas-vindas e selo da loja; clique em uma sugestão; pergunta de preço com a linha de status; recarregar e ver a conversa restaurada; "Nova conversa"; largura de 360 px sem rolagem horizontal; erro do servidor de modelos tratado na tela.
+- Rodar os fluxos com um LLM roteirizado (determinístico) e, ao menos uma vez, com o modelo real.
+- Rodar também `uv run emporio-chat` e `uv run emporio-evals --so <casos>` como verificação de fumaça.
+- Corrigir o que aparecer; manter testes unitários apenas onde pegam bug que o E2E não pega.
+
+Aceite: fluxos mínimos passam; defeitos encontrados corrigidos ou registrados como limitação no README.
+Commit final: `test(e2e): fluxos da interface e correções`.
+
+### E9. README final e entrega (dia 2, 1h30, P0)
 Seções: 0.2, 0.3, 1, 16, 17.
 - README: instruções testadas a partir de um clone limpo, resultados dos evals, limitações atualizadas.
 - Auditoria final com `github-security-audit`.
