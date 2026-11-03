@@ -3,22 +3,16 @@
 from __future__ import annotations
 
 import re
-import unicodedata
 from decimal import Decimal
 from typing import Any
 
 from emporio.domain.money import arredondar, para_decimal
+from emporio.domain.texto import normalizar
 
 MARCAS = (
     "Yamaha", "Tagima", "Giannini", "Rozini", "Shelby", "Crafter", "Martin", "Taylor", "Takamine", "Kala",
     "Ohana", "Kalani", "Fender", "Gibson", "Ibanez", "PRS", "Music Man", "Pearl", "Korg", "Nord", "Roland",
 )
-
-
-def normalizar(texto: str) -> str:
-    """Minúsculas e sem acentos, para comparação e busca."""
-    decomposto = unicodedata.normalize("NFKD", texto)
-    return "".join(c for c in decomposto if not unicodedata.combining(c)).lower()
 
 
 _PADROES_MARCA = {marca: re.compile(rf"\b{re.escape(normalizar(marca))}\b") for marca in MARCAS}
