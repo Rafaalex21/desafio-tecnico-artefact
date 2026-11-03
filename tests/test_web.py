@@ -75,7 +75,7 @@ def test_historico_restaura_so_o_que_o_cliente_ve(banco, politicas_geradas, tmp_
         {"role": "user", "content": "Onde vocês ficam?"},
         {"role": "assistant", "content": "Ficamos em Campo Grande."},
     ]
-    assert cliente.get("/api/sessions/outra-sessao/messages").json() == {"messages": []}
+    assert cliente.get("/api/sessions/outra-sessao/messages").json() == {"messages": [], "em_curso": None}
 
 
 @pytest.mark.parametrize(

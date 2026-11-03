@@ -278,14 +278,17 @@
     try {
       const r = await fetch("/api/sessions/" + sessao + "/messages");
       if (!r.ok) return false;
-      const { messages } = await r.json();
-      if (!messages.length) return false;
+      const { messages, em_curso: emCurso } = await r.json();
+      if (!messages.length && !emCurso) return false;
       messages.forEach((m) => {
         if (m.role === "user") linhaUsuario(m.content);
         else linhaRiff(markdown(m.content));
       });
+      if (emCurso) {
+        linhaUsuario(emCurso.mensagem);
+        aguardarTurnoEmCurso(messages.length);
+      }
       el.mensagens.scrollTop = el.mensagens.scrollHeight;
-      if (messages[messages.length - 1].role === "user") aguardarTurnoEmCurso(messages.length);
       return true;
     } catch (e) {
       return false;
@@ -296,19 +299,23 @@
   async function aguardarTurnoEmCurso(quantidade) {
     travar(true);
     atividade("Pensando");
-    for (let tentativa = 0; tentativa < 90; tentativa++) {
-      await new Promise((ok) => setTimeout(ok, 2000));
+    let concluido = false;
+    for (let tentativa = 0; tentativa < 90 && !concluido; tentativa++) {
+      await new Promise((ok) => setTimeout(ok, 1500));
       try {
         const r = await fetch("/api/sessions/" + sessao + "/messages");
-        const { messages } = await r.json();
+        const { messages, em_curso: emCurso } = await r.json();
+        if (emCurso) continue;
+        concluido = true;
+        fimAtividade();
+        const { balao, linha } = linhaRiff("");
         if (messages.length > quantidade) {
-          fimAtividade();
-          const { balao } = linhaRiff("");
           balao.innerHTML = markdown(messages[messages.length - 1].content);
-          rolar();
-          travar(false);
-          return;
+        } else {
+          linha.classList.add("erro");
+          balao.innerHTML = "<p>Não consegui concluir essa resposta. Pode mandar a pergunta de novo?</p>";
         }
+        rolar();
       } catch (e) { /* tenta de novo */ }
     }
     fimAtividade();

@@ -45,6 +45,7 @@ def criar_app(agente: Agente | None = None, config: Settings | None = None) -> F
     app = FastAPI(title="Empório da Música", docs_url=None, redoc_url=None)
     travas: dict[str, threading.Lock] = {}
     travas_guarda = threading.Lock()
+    em_curso: dict[str, str] = {}
 
     def trava(session_id: str) -> threading.Lock:
         """Um turno por vez em cada sessão: o histórico e a verificação de identidade são gravados ao fim do turno."""
@@ -64,6 +65,7 @@ def criar_app(agente: Agente | None = None, config: Settings | None = None) -> F
             laco.call_soon_threadsafe(fila.put_nowait, item)
 
         def executar() -> None:
+            em_curso[entrada.session_id] = entrada.message
             try:
                 with trava(entrada.session_id):
                     resultado = agente.responder(
@@ -90,6 +92,7 @@ def criar_app(agente: Agente | None = None, config: Settings | None = None) -> F
                 log.exception("Falha no turno da sessão %s", entrada.session_id)
                 publicar(("error", {"mensagem": "Algo deu errado do nosso lado. Tente de novo em instantes."}))
             finally:
+                em_curso.pop(entrada.session_id, None)
                 publicar(FIM)
 
         async def fluxo() -> AsyncIterator[str]:
@@ -111,7 +114,11 @@ def criar_app(agente: Agente | None = None, config: Settings | None = None) -> F
     def mensagens(session_id: str) -> dict[str, Any]:
         if not ID_SESSAO.fullmatch(session_id):
             raise HTTPException(status_code=422, detail="Identificador de sessão inválido.")
-        return {"messages": agente.memoria.mensagens_visiveis(session_id)}
+        pendente = em_curso.get(session_id)
+        return {
+            "messages": agente.memoria.mensagens_visiveis(session_id),
+            "em_curso": {"mensagem": pendente} if pendente else None,
+        }
 
     @app.get("/api/loja")
     def loja() -> dict[str, Any]:
