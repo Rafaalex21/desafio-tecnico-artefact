@@ -131,7 +131,8 @@ def main() -> int:
         try:
             resultado = executar(cliente, args.model, cfg.llm_temperature, extra)
         except Exception as erro:  # noqa: BLE001 - registra e tenta a próxima variação
-            print(f"  falhou: {erro}")
+            corpo = getattr(getattr(erro, "response", None), "text", "")
+            print(f"  falhou: {erro} {corpo[:300]}")
             continue
         print(
             f"  tool call: {resultado['tool_call']['nome']}"
