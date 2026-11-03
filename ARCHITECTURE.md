@@ -300,6 +300,8 @@ Comportamento: filtros em SQL sobre a visão `catalogo`; se houver `termo`, pont
 
 Saída: `{total_encontrado, exibidos, categoria_sem_itens, produtos: [{id, nome, categoria, preco, promocao: {percentual, preco_promocional} | null, disponibilidade}]}`.
 
+O termo é comparado em duas grafias, com pontuação como espaço e colado (`gd-20` e `gd20`). Categoria desconhecida devolve o erro `categoria_invalida` com a lista das válidas; o enum do esquema é montado a partir do banco.
+
 Testes: "takamine gd20" e "gd-20" retornam o 95 em primeiro; categoria Violões com `preco_max` 1000 retorna 12 itens e exclui 96 e 113; categoria "Instrumentos de Sopro (Metais)" retorna `categoria_sem_itens: true`; `apenas_em_promocao` retorna 90, 94, 121 e 127.
 
 ### 7.2 `detalhes_produto`
@@ -309,12 +311,14 @@ Comportamento: id exato ou melhor correspondência por nome; se houver empate pr
 
 Saída: `{id, nome, marca, categoria, preco, promocao, preco_pix | null, disponibilidade, ultimas_unidades, especificacoes, descricao | null, alternativas}`.
 
+Nome sem correspondência acima do corte devolve `produto_nao_encontrado`; empate próximo devolve o erro `produto_ambiguo` com a lista `candidatos`. `preco_pix` é `null` para produto em promoção e para produto indisponível.
+
 Testes: 113 traz ao menos uma alternativa "7 Cordas"; 135 vem com `descricao: null`; 94 traz promoção de 8% e `preco_pix: null`.
 
 ### 7.3 `simular_compra`
 Parâmetros: `produtos` (lista de `{id, quantidade}`), `cidade_entrega` (opcional).
 
-Saída: `{itens, subtotal, total_pix, opcoes_cartao: [{parcelas, valor_parcela}], parcelas_maximas, combinacao_permitida, frete: {tipo, valor | null, prazo, observacao}}`. Itens indisponíveis geram erro `produto_indisponivel` com a disponibilidade.
+Saída: `{itens, subtotal, total_pix, opcoes_cartao: [{parcelas, valor_parcela}], parcelas_maximas, combinacao_permitida, frete: {tipo, valor | null, prazo, observacao}}`. Itens indisponíveis geram erro `produto_indisponivel` com a disponibilidade. Quantidade acima do estoque gera `estoque_insuficiente`, sem revelar o saldo. Itens repetidos são somados. Parcelamento e frete se calculam sobre o subtotal (preço final com promoção); o PIX é calculado item a item e a saída traz também `economia_pix`.
 
 ### 7.4 `consultar_pedido`
 Parâmetros: `numero_pedido` (inteiro, opcional), `email` (opcional), `telefone` (opcional).
@@ -323,7 +327,9 @@ Saída verificada: `{numero, cliente_primeiro_nome, data_compra, status, status_
 
 Formas de pagamento: `pix` "PIX", `debit` "Cartão de débito", `boleto` "Boleto", `credit_Nx` "Cartão de crédito em Nx".
 
-Erros: `verificacao_necessaria` (faltam dados; a mensagem diz quais pedir), `dados_nao_conferem` (mensagem única, regra 6.11), `tentativas_excedidas`.
+Sem número do pedido e com e-mail e telefone conferidos (ou com cliente já verificado na sessão e nenhum dado novo), a saída é `{pedidos: [{numero, data_compra, status_texto, total}]}`. Datas saem em `dd/mm/aaaa`. Em `elegibilidade`, cada direito traz `{elegivel, prazo_final, dias_restantes}` (o último dia do prazo ainda vale) e vem o texto fixo da garantia do fabricante.
+
+Erros: `verificacao_necessaria` (faltam dados; a mensagem diz quais pedir; não conta como tentativa falha), `dados_nao_conferem` (mensagem única, regra 6.11), `tentativas_excedidas`.
 
 ### 7.5 `consultar_politicas`
 Parâmetros: `topicos` (lista de 1 a 3 itens do enum abaixo).
@@ -341,7 +347,7 @@ Parâmetros: `topicos` (lista de 1 a 3 itens do enum abaixo).
 
 O texto servido já traz as decisões T11 (e-mail sem acento, telefone com espaço) e T12 (a tabela de pagamentos remete à seção 3.1 em vez de fixar R$ 100,00); o campo `correcoes` de `politicas.json` registra cada troca. As seções 7 (procedimentos internos de atendimento) e 10 (disposições finais) não são expostas: o conteúdo delas está compilado no system prompt como regra de comportamento.
 
-Saída: `{secoes: [{numero, titulo, texto}]}` com o texto em markdown, tabelas preservadas.
+Saída: `{secoes: [{numero, titulo, texto}]}` com o texto em markdown, tabelas preservadas. Seção que pertence a mais de um tópico aparece uma vez. Lista vazia ou com mais de 3 tópicos devolve `topicos_invalidos`.
 
 ### 7.6 `encaminhar_atendente`
 Parâmetros: `motivo` (`reclamacao` | `pedido_atrasado` | `solicitacao_do_cliente` | `fora_das_regras` | `outro`), `resumo` (texto), `numero_pedido` (opcional), `contato` (opcional, informado pelo cliente).
