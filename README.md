@@ -2,7 +2,7 @@
 
 Este repositório contém o protótipo de um agente conversacional de atendimento ao cliente para a Empório da Música, loja fictícia de instrumentos musicais sediada em Campo Grande (MS), desenvolvido como resposta ao desafio técnico para a posição de AI Engineer da Artefact. O agente conversa em português, adota a persona de um atendente com afinidade pelo rock, consulta catálogo, pedidos e políticas da loja por meio de ferramentas determinísticas e opera com modelos de linguagem executados localmente.
 
-A especificação completa, que orientou a implementação etapa por etapa, encontra-se em [ARCHITECTURE.md](ARCHITECTURE.md). Uma versão deste documento em PDF está em [README.pdf](README.pdf).
+A especificação completa, que orientou a implementação etapa por etapa, encontra-se em [ARCHITECTURE.md](ARCHITECTURE.md). Há uma versão deste documento em inglês em [README.en.md](README.en.md). As versões em PDF são [README.pdf](README.pdf) (português) e [README.en.pdf](README.en.pdf) (inglês).
 
 ## Sumário
 
@@ -100,10 +100,11 @@ uv run python scripts/anonimizar_relatorio_e2e.py
 
 Para repetir um fluxo contra o modelo local de verdade, defina `E2E_MODELO_REAL=1` com o servidor de modelos ligado e rode `uv run pytest tests/e2e -m "e2e and real"`.
 
-O `README.pdf` é gerado a partir deste arquivo, com o navegador já instalado e a biblioteca `markdown`, que não faz parte das dependências do projeto:
+Os PDFs são gerados a partir dos arquivos README, com o navegador já instalado e a biblioteca `markdown`, que não faz parte das dependências do projeto. O primeiro comando gera o `README.pdf` a partir deste arquivo, e o segundo gera o `README.en.pdf` a partir de `README.en.md`:
 
 ```bash
 uv run --with markdown python scripts/gerar_readme_pdf.py
+uv run --with markdown python scripts/gerar_readme_pdf.py README.en.md README.en.pdf
 ```
 
 ### 2.4 Configuração

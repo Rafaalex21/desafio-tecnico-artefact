@@ -76,12 +76,14 @@ def converter(texto: str) -> str:
 
 
 def main() -> int:
-    origem = RAIZ / "README.md"
-    destino = RAIZ / "README.pdf"
+    origem = RAIZ / (sys.argv[1] if len(sys.argv) > 1 else "README.md")
+    destino = RAIZ / (sys.argv[2] if len(sys.argv) > 2 else "README.pdf")
+    ingles = origem.name.endswith(".en.md")
+    titulo = "Empório da Música Customer Service Agent" if ingles else "Agente de atendimento da Empório da Música"
     corpo = converter(origem.read_text(encoding="utf-8"))
     html = (
-        '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Agente de atendimento da Empório da '
-        f"Música</title><style>{ESTILO}</style></head><body>{corpo}</body></html>"
+        f'<!doctype html><html lang="{"en" if ingles else "pt-BR"}"><head><meta charset="utf-8">'
+        f"<title>{titulo}</title><style>{ESTILO}</style></head><body>{corpo}</body></html>"
     )
     canal = os.environ.get("E2E_CANAL", "msedge") or None
     with tempfile.TemporaryDirectory() as pasta, sync_playwright() as p:
