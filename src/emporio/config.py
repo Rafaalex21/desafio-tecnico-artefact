@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     agora_referencia: datetime | None = None
     history_max_tokens: int = 6000
     db_path: Path = Path("data/processed/emporio.db")
+    politicas_path: Path = Path("data/processed/politicas.json")
     conversas_db_path: Path = Path("data/processed/conversas.db")
     handoff_path: Path = Path("data/processed/handoff.jsonl")
 
