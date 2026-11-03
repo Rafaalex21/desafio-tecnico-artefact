@@ -437,6 +437,8 @@ Argumentos inválidos em uma tool call voltam ao modelo como erro de ferramenta 
 | G3 | Dados pessoais | Garantido na camada de ferramentas (P4, 6.11) |
 | G4 | Entrada | Máximo de 2.000 caracteres; remove caracteres de controle |
 | G5 | Raciocínio vazado | Remove `<think>...</think>` e equivalentes antes de exibir |
+| G6 | Promoção completa | Se a resposta cita o preço promocional de um produto (busca, detalhes ou simulação), precisa trazer também o preço original e o percentual. Uma correção por turno; persistindo, a resposta segue como está |
+| G7 | Parcelamento simulado | Se o cliente falou de parcelas ou cartão, o agente consultou um produto (`detalhes_produto` ou `buscar_produtos`) e não chamou `simular_compra`, uma correção manda chamá-la sem pedir cidade. Compartilha com o G6 a única correção por turno |
 
 Resposta segura: "Opa, me enrolei aqui pra confirmar essa informação. Pode reformular a pergunta, ou prefere que eu chame alguém da equipe?"
 

@@ -137,6 +137,8 @@ O prompt de sistema é um arquivo versionado, preenchido a cada turno com a data
 
 Como salvaguarda adicional, toda resposta passa por uma verificação antes de chegar ao cliente: cada valor em reais citado precisa constar de algum resultado de ferramenta da conversa ou de mensagem do próprio cliente. Uma resposta reprovada é devolvida ao modelo uma única vez, com a lista de valores permitidos; persistindo o erro, o cliente recebe uma resposta segura que oferece atendimento humano.
 
+Duas verificações adicionais cobrem falhas que o prompt sozinho não eliminou nas avaliações. A primeira exige que toda resposta que cite o preço promocional de um produto traga também o preço original e o percentual de desconto, regra do manual que o modelo esquecia ao falar de parcelas. A segunda detecta que o cliente perguntou sobre parcelas ou cartão, que o agente consultou um produto e que a simulação de compra não foi chamada, caso em que o modelo costumava pedir a cidade em vez de calcular. Em ambas, a resposta é devolvida ao modelo uma única vez com o que falta; se persistir, é entregue como está, por não se tratar de informação incorreta.
+
 ### 3.6 Persona
 
 O manual da loja descreve o tom desejado como informal, mas profissional, comparável a uma conversa com um amigo que entende de música. A persona adotada, chamada Riff, acrescenta a esse tom uma afinidade declarada pelo rock, coerente com a identidade de uma loja de instrumentos. A personalidade é regulada por limites explícitos: no máximo uma expressão característica e um emoji por mensagem, nenhuma descontração em reclamações, atrasos ou cancelamentos, e prioridade absoluta da clareza sobre o estilo.
@@ -216,25 +218,38 @@ Os números abaixo vêm de uma execução de cada configuração, com o prompt e
 
 | Configuração | Roteamento | Asserções | Casos aprovados | Latência p50 | Latência p95 |
 |---|---|---|---|---|---|
-| Qwen3-14B com raciocínio (padrão) | 24/24 (100,0%) | 126/130 (96,9%) | 28/32 (87,5%) | 14,3 s | 20,9 s |
+| Qwen3-14B com raciocínio, antes dos guardrails de promoção e parcelamento | 24/24 (100,0%) | 126/130 (96,9%) | 28/32 (87,5%) | 14,3 s | 20,9 s |
+| Qwen3-14B com raciocínio, com esses guardrails (padrão) | 22/24 (91,7%) | 120/130 (92,3%) | 28/32 (87,5%) | 14,9 s | 30,5 s |
 | gpt-oss-20b, esforço baixo | 23/24 (95,8%) | 123/130 (94,6%) | 26/32 (81,2%) | 6,3 s | 11,2 s |
 | Qwen3-14B sem raciocínio | 18/24 (75,0%) | 117/130 (90,0%) | 25/32 (78,1%) | 4,6 s | 9,0 s |
 
-Nenhuma configuração acionou a resposta segura do verificador de valores monetários, e apenas o Qwen3-14B sem raciocínio precisou de uma correção. O critério de aceite de 90% de acerto de roteamento foi atendido pelo Qwen3-14B com raciocínio e pelo gpt-oss-20b.
+Nenhuma configuração acionou a resposta segura do verificador de valores monetários; ele pediu uma correção ao Qwen3-14B sem raciocínio e duas à versão final do Qwen3-14B. O critério de aceite de 90% de acerto de roteamento foi atendido pelo Qwen3-14B com raciocínio, antes e depois dos novos guardrails, e pelo gpt-oss-20b. As três primeiras linhas foram medidas antes da inclusão dos guardrails de promoção completa e de parcelamento simulado (seção 3.5), e a última com eles.
 
 ### 6.2 Leitura dos resultados e limites da medição
 
 A variação entre execuções é relevante: durante o desenvolvimento, o Qwen3-14B sem raciocínio oscilou entre 18 e 21 acertos de roteamento, e o gpt-oss-20b entre 25 e 27 casos aprovados, com prompts equivalentes. Diferenças de um ou dois casos entre configurações não são, portanto, conclusivas; a diferença no roteamento do Qwen3-14B sem raciocínio é a única que se manteve em todas as execuções.
 
-Algumas falhas do modelo escolhido são reais. No caso ped-04, a resposta sobre arrependimento de um pedido com prazo vencido não menciona que a garantia legal continua válida até 18/05/2026. No caso pag-01, o preço original da promoção é omitido ao falar das parcelas, contrariando a regra de apresentar preço original, percentual e preço final. Outras falhas são falsos negativos léxicos da avaliação, em que a resposta está correta mas não contém o termo esperado: esc-01 (a resposta recusa o pedido de cordas sem a palavra "instrumento") e, em outras configurações, cat-05 e pol-02. Esses casos foram mantidos como escritos, para não ajustar a medição ao resultado.
+Na execução final, os novos guardrails resolveram as falhas que motivaram sua criação: os quatro casos de pagamento passaram, contra três de quatro antes, com o preço original da promoção e o parcelamento presentes. A contagem total de casos aprovados, porém, não mudou (28 de 32), porque outros casos oscilaram entre as duas execuções: ped-04 e ped-07 passaram na final, enquanto ped-02 e ped-03 falharam, com o modelo pedindo o telefone ao cliente que já informara o e-mail e sem chamar `consultar_pedido`, e esc-03 falhou porque a recusa de desconto veio acompanhada de uma lista de promoções com valores. Isso confirma a variação descrita acima e indica o principal ponto fraco do modelo escolhido: com o raciocínio ligado, ele às vezes responde sem consultar a ferramenta, falha que apenas o prompt e os guardrails atuais mitigam, mas não eliminam. Outras falhas são falsos negativos léxicos da avaliação, em que a resposta está correta mas não contém o termo esperado: esc-01 (a resposta recusa o pedido de cordas sem a palavra "instrumento") e, em outras configurações, cat-05 e pol-02. Esses casos foram mantidos como escritos, para não ajustar a medição ao resultado.
 
 Dois ajustes foram feitos nos próprios casos após a primeira execução, e ambos são declarados aqui. O caso ped-07, que testa o bloqueio após três verificações malsucedidas, passou a repetir, em cada tentativa, a mesma frase completa com um e-mail diferente, pois a versão inicial, com mensagens curtas como "tente com teste2", levava o modelo a responder sem chamar a ferramenta. Mesmo com a nova redação, o Qwen3-14B com raciocínio reproduziu a mensagem de falha na terceira tentativa sem consultar o pedido, de modo que o bloqueio não chegou a ser acionado e a quarta tentativa, com o e-mail correto, foi atendida. A falha desse caso mostra que o contador de tentativas depende de o modelo chamar a ferramenta. Além disso, o comparador de texto passou a tratar hifens tipográficos como hífen comum, porque o gpt-oss-20b os emite em nomes de produto ("GF‑3D"), o que reprovava respostas corretas.
 
-Por fim, os casos foram escritos pelo próprio autor, que conhecia as armadilhas dos dados, e cada um é executado uma única vez por configuração. Os números servem para comparar configurações e detectar regressões, não como estimativa de desempenho em atendimentos reais.
+Os relatórios de cada execução estão em `evals/reports/`; a execução final do Qwen3-14B é `qwen3-14b-com-raciocinio-g6-g7`. Por fim, os casos foram escritos pelo próprio autor, que conhecia as armadilhas dos dados, e cada um é executado uma única vez por configuração. Os números servem para comparar configurações e detectar regressões, não como estimativa de desempenho em atendimentos reais.
 
 ## 7. Exemplos de interação
 
-O diretório [examples/](examples/) reúne conversas geradas por script a partir de execuções reais do agente, com a data de referência fixada em 25/03/2026 às 10h30. Cada arquivo registra o modelo utilizado e as ferramentas chamadas em cada turno. Os cenários cobrem consulta ao catálogo com faixa de preço, informações gerais da loja, preço com promoção e parcelamento, pedido de devolução com verificação de identidade e aplicação dos prazos do manual, e perguntas fora do escopo, incluindo acessórios e tentativa de manipulação.
+O diretório [examples/](examples/) reúne conversas geradas por script a partir de execuções reais do agente, com a data de referência fixada em 25/03/2026 às 10h30. Cada arquivo registra o modelo utilizado e as ferramentas chamadas em cada turno. Os cenários cobrem consulta ao catálogo com faixa de preço, informações gerais da loja, preço com promoção e parcelamento, pedido de devolução com verificação de identidade e aplicação dos prazos do manual, e perguntas fora do escopo, incluindo acessórios e tentativa de manipulação. Os arquivos, gerados por `scripts/gerar_exemplos.py`, são:
+
+| Arquivo | Cenário |
+|---|---|
+| [01_catalogo_faixa_de_preco.md](examples/01_catalogo_faixa_de_preco.md) | Violões até R$ 1.000 e recomendação para iniciante |
+| [02_endereco_e_horario.md](examples/02_endereco_e_horario.md) | Endereço e horário de sábado, respondidos pela ficha da loja |
+| [03_promocao_e_parcelamento.md](examples/03_promocao_e_parcelamento.md) | Produto em promoção, parcelas e PIX |
+| [04_devolucao_com_verificacao.md](examples/04_devolucao_com_verificacao.md) | Devolução com e-mail incorreto e depois correto, prazo vencido e garantia legal (caso não trivial) |
+| [05_fora_de_escopo_e_manipulacao.md](examples/05_fora_de_escopo_e_manipulacao.md) | Acessório que a loja não vende, pedido de desconto ignorando as instruções e assunto alheio (caso não trivial) |
+
+As capturas da tela de chat estão em [examples/captura_desktop_escuro.jpg](examples/captura_desktop_escuro.jpg) e [examples/captura_celular_claro.jpg](examples/captura_celular_claro.jpg).
+
+Cada arquivo é uma única execução de um modelo não determinístico, sem edição das respostas. O cenário 05 foi gerado duas vezes: na primeira, diante do pedido de desconto, o Riff ofereceu avisar o cliente quando o Takamine GD20 "voltasse a estar disponível", embora o produto esteja à venda, e a segunda execução foi a mantida. A primeira execução não foi guardada, e a ocorrência ilustra o tipo de erro que a avaliação da seção 6 mede de forma agregada.
 
 ## 8. Limitações conhecidas e trabalhos futuros
 
