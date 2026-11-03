@@ -146,7 +146,7 @@ Todos os CSVs estão em UTF-8 válido. O caractere de substituição que aparece
 
 ### 5.2 Modelo no SQLite (`data/processed/emporio.db`)
 
-Tabelas espelham os CSVs com tipos corretos (preços como `TEXT` decimal ou `REAL` convertido para `Decimal` na leitura; datas ISO). Colunas derivadas em `products`:
+Tabelas espelham os CSVs com tipos corretos: valores em reais viram centavos inteiros (`price_cents`, `total_cents`), exatos e comparáveis em SQL, e a conversão para `Decimal` é feita na leitura (`domain.money`); datas em ISO. Colunas adicionais fora dos CSVs: `customers.email_norm` e `customers.phone_digits` (verificação de identidade, 6.11), `orders.total_itens_cents` e `orders.total_divergente` (T7). Colunas derivadas em `products`:
 
 | Coluna | Regra |
 |---|---|
@@ -155,7 +155,9 @@ Tabelas espelham os CSVs com tipos corretos (preços como `TEXT` decimal ou `REA
 | `descricao_confiavel` | 0 se a descrição citar marca da lista diferente da marca do nome (T5); 1 caso contrário |
 | `texto_busca` | Nome + nome da categoria + valores de `specs` traduzidos (`steel` vira "aço", `electronics: yes` vira "elétrico") + descrição se confiável; tudo minúsculo e sem acentos |
 
-Visão `catalogo`: produto + promoção ativa de maior desconto (se houver) + `preco_final`.
+Vista `catalogo`: produto + categoria + promoção ativa de maior desconto (`promo_percent`, `promo_descricao`) + `preco_final_cents`. A promoção só vale para produto `disponivel` (6.3). A conta usa centavos inteiros com metade para cima e é testada contra `domain.catalog.preco_final`.
+
+Chaves de busca: `texto_busca` inclui sinônimos da categoria no singular (por exemplo "violão" para Violões), para que a busca por termo do cliente encontre a categoria.
 
 ### 5.3 Inconsistências encontradas e tratamento
 
@@ -167,11 +169,11 @@ Estes IDs são citados no README, no relatório de qualidade e nos testes.
 | T2 | Produto ativo com estoque zero | 96 Giannini GF-3D | `disponibilidade = esgotado`; agente informa e sugere alternativas (manual 7.3) |
 | T3 | Produto descontinuado ainda com estoque | 136 Ibanez Bass 2X (13 unidades); 113 Shelby SN-7C (0) | `descontinuado` prevalece sobre o estoque: o manual 7.3 manda informar que o produto não faz mais parte do catálogo |
 | T4 | Produto "em breve" com estoque e já vendido | 130 Kala KA-ABP-CTG (`coming_soon`, 2 unidades, presente nos pedidos 3 e 14) | `disponibilidade = em_breve`, não é oferecido para compra; pedidos históricos continuam válidos. O status é tratado como estado atual do catálogo |
-| T5 | Descrição de outra marca | 135 "Music Man Bass 1X" descrito como Fender Jazz Bass; 137 "Yamaha Bass 3X" como Ibanez; 142 "Korg Synth 1 Pro" como Roland (faixa 131 a 145 tem descrições geradas) | O nome é a fonte canônica; `descricao_confiavel = 0` remove a descrição da busca e das respostas, que passam a usar só nome e specs |
+| T5 | Descrição de outra marca | 135 "Music Man Bass 1X" descrito como Fender Jazz Bass; 137 "Yamaha Bass 3X" como Ibanez; 139 bateria Yamaha descrita como Pearl; 142 "Korg Synth 1 Pro" como Roland; 144 "Roland Synth 3 Pro" como Yamaha (5 produtos, todos na faixa 131 a 145) | O nome é a fonte canônica; `descricao_confiavel = 0` remove a descrição da busca e das respostas, que passam a usar só nome e specs |
 | T6 | Histórico de promoções com repetições | Produtos 93, 96 e 99 têm duas entradas; só 4 de 25 estão ativas (produtos 90, 94, 121, 127) | Só `is_active = 1` vale. Se houver mais de uma ativa no mesmo produto, vale a de maior desconto (promoções não são cumulativas, manual 6.2) |
 | T7 | Total do pedido diferente da soma dos itens | Pedido 3: 3.450,00 contra 3.498,00; pedido 20: 1.400,00 contra 1.488,00 | `total_brl` do pedido prevalece (pode refletir negociação); o agente não recalcula pedidos; a divergência vai para o relatório |
 | T8 | E-mail compartilhado por dois clientes | `bruno.martins@jmail.com` nos clientes 11 e 43 | Verificação por número do pedido + e-mail ou telefone; sem número, exige e-mail e telefone juntos (regra 6.11) |
-| T9 | Parcelamentos históricos abaixo do mínimo | Pedido 9: 6x de R$ 58,32; pedido 16: 6x de R$ 71,65 (mínimo 80 para 4x a 6x) | Registro histórico, o agente não questiona; as regras atuais valem apenas para simulações |
+| T9 | Parcelamentos históricos abaixo do mínimo | Pedido 9: 6x de R$ 58,32; pedido 16: 6x de R$ 71,65 (mínimo 80 para 4x a 6x); pedido 18, cancelado: 12x de R$ 38,33 (mínimo 100) | Registro histórico, o agente não questiona; as regras atuais valem apenas para simulações |
 | T10 | Pedido enviado com previsão vencida | Pedido 8 (`shipped`, previsão 28/02/2026) | Flag `entrega_atrasada`; o agente se desculpa, informa o rastreio e oferece encaminhamento |
 | T11 | Contatos divergentes no manual | Telefone/WhatsApp (67) 3341-4444 na ficha 1.2 contra WhatsApp (67) 3321-4500 na seção 7; e-mail sem acento na capa e com acento na ficha | Ficha 1.2 é a fonte para telefone e WhatsApp; e-mail sem acento (domínio com acento é improvável e a capa usa ASCII). Pendência a validar com a loja |
 | T12 | Parcela mínima contraditória | Tabela da seção 3 diz parcela mínima de R$ 100,00; a seção 3.1 escalona por número de parcelas | A seção 3.1, mais específica, prevalece |
