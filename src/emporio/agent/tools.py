@@ -101,6 +101,7 @@ class EncaminharAtendente(_Entrada):
     """Registra o caso para a equipe humana e devolve o protocolo e o prazo de retorno.
 
     Use em reclamação, pedido atrasado, pedido de falar com uma pessoa ou caso que as regras não cobrem.
+    Dúvida sobre como funcionam trocas, devoluções ou outras regras não é caso para esta ferramenta.
     """
 
     motivo: Literal["reclamacao", "pedido_atrasado", "solicitacao_do_cliente", "fora_das_regras", "outro"]
