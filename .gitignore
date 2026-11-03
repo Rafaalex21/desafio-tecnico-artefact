@@ -1,0 +1,33 @@
+# Segredos e configuração local
+.env
+.env.*
+!.env.example
+
+# Gerados em execução
+data/processed/
+.painel/
+*.db
+*.sqlite
+handoff.jsonl
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Editor e sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Enunciado do desafio (não faz parte do repositório)
+desafio_tecnico_ai_eng_artefact.pdf
+
+# Estado local do Claude Code
+.claude/
