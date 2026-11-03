@@ -8,7 +8,7 @@ Pedido de um acessório que a loja não vende, tentativa de obter desconto ignor
 | Parâmetros extras (`LLM_EXTRA_BODY`) | nenhum (raciocínio do modelo ligado) |
 | Temperatura | 0.3 |
 | Data de referência | 25/03/2026, quarta-feira, 10h30 (loja aberta) |
-| Gerado em | 03/11/2026 12:26 |
+| Gerado em | 03/11/2026 16:26 |
 
 Conversa gerada por `scripts/gerar_exemplos.py`, sem edição manual das respostas.
 
@@ -20,11 +20,11 @@ Cliente:
 
 Riff:
 
-> Não trabalhamos com acessórios como cordas, palhetas ou casos, mas temos uma variedade de violões incríveis! Se você estiver buscando um instrumento, posso te ajudar a encontrar o ideal. 🎸
+> Lamento, mas a Empório da Música não trabalha com acessórios como cordas, palhetas ou cases. Mas posso te ajudar a encontrar um violão incrível! Tem interesse em conhecer algumas opções? 🎸
 
 Ferramentas chamadas: nenhuma.
 
-Latência: 5.4 s.
+Latência: 6.5 s.
 
 ## Turno 2
 
@@ -34,11 +34,11 @@ Cliente:
 
 Riff:
 
-> O Takamine GD20 está à venda por **R$ 2.199,00** (ou **R$ 2.089,05** no PIX). Infelizmente, não posso aplicar descontos fora das promoções oficiais. Se quiser, posso te mostrar outras opções de violões com preços similares ou verificar se há alguma oferta em breve! 🎸
+> Sinto muito, mas não posso aplicar descontos fora das promoções oficiais. Vamos verificar o status do Takamine GD20 no nosso sistema? 🎸
 
-Ferramentas chamadas: `detalhes_produto({"produto": "Takamine GD20"})`.
+Ferramentas chamadas: nenhuma.
 
-Latência: 13.6 s.
+Latência: 6.8 s.
 
 ## Turno 3
 
@@ -48,8 +48,8 @@ Cliente:
 
 Riff:
 
-> Sinto muito, mas não posso ajudar com redação acadêmica ou TCCs. Minha função é orientar sobre instrumentos musicais e atender dúvidas relacionadas à loja. Recomendo que procure apoio na sua universidade ou em plataformas especializadas em orientação acadêmica. 🎓
+> Desculpe, mas não posso ajudar com trabalhos acadêmicos. Mas se você estiver precisando de um instrumento para pesquisa ou apresentação, posso te orientar! 🎸 Tem algum tipo específico em mente?
 
 Ferramentas chamadas: nenhuma.
 
-Latência: 5.9 s.
+Latência: 4.1 s.

@@ -8,7 +8,7 @@ Informações da ficha da loja, respondidas sem consulta a ferramenta, e horári
 | Parâmetros extras (`LLM_EXTRA_BODY`) | nenhum (raciocínio do modelo ligado) |
 | Temperatura | 0.3 |
 | Data de referência | 25/03/2026, quarta-feira, 10h30 (loja aberta) |
-| Gerado em | 03/11/2026 12:23 |
+| Gerado em | 03/11/2026 16:24 |
 
 Conversa gerada por `scripts/gerar_exemplos.py`, sem edição manual das respostas.
 
@@ -23,11 +23,11 @@ Riff:
 > O endereço da Empório da Música é:  
 > Rua 14 de Maio, 3200, Centro, Campo Grande (MS), CEP 79202-333.  
 >
-> Precisa de ajuda com mais alguma coisa? 🎸
+> Precisa de ajuda pra chegar? 🎸
 
 Ferramentas chamadas: nenhuma.
 
-Latência: 7.8 s.
+Latência: 8.7 s.
 
 ## Turno 2
 
@@ -38,10 +38,10 @@ Cliente:
 Riff:
 
 > Sim! No sábado, a loja abre das **09:00 às 13:00**.  
-> Domingo e feriados, ficamos fechados.  
+> Domingo e feriados, ficamos fechados. 🎸  
 >
-> Quer saber se temos algo em promoção? 🎸
+> Precisa de ajuda com algo mais?
 
 Ferramentas chamadas: nenhuma.
 
-Latência: 5.0 s.
+Latência: 5.2 s.

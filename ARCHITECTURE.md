@@ -444,11 +444,13 @@ Argumentos inválidos em uma tool call voltam ao modelo como erro de ferramenta 
 | G10 | Situação do produto | Se um resultado de ferramenta marca um produto como esgotado, descontinuado ou em breve e a resposta o cita sem dizer a situação exata, ou hesita sobre um descontinuado ("temporariamente", "pode ser que"), uma correção pede a situação exata mantendo o resto da resposta. Compartilha a única correção por turno |
 | G11 | Datas rastreáveis | Toda data da resposta (dd/mm/aaaa, dd/mm ou "24 de fevereiro") precisa constar do prompt, de resultado de ferramenta ou de fala do cliente; senão, uma correção pede só as datas devolvidas pela ferramenta. Compartilha a única correção por turno |
 | G12 | Encaminhamento registrado | Se a resposta diz que encaminhou o caso ("encaminhei", "vou encaminhar") sem `encaminhar_atendente` ter sido chamada, ou cita um protocolo ausente dos resultados de ferramenta, uma correção manda chamá-la. Tem prioridade sobre os demais. Compartilha a única correção por turno |
+| G13 | Tom e redação | Em reclamação encaminhada, entrega atrasada ou pedido cancelado, o código remove emojis da resposta final (o manual pede tom sem emoji), e em qualquer resposta troca o tique "algo else" do Qwen3-14B por "algo mais". Não faz nova chamada ao modelo |
+| G14 | Credenciais do cliente | `consultar_pedido` só recebe e-mail e telefone que o cliente escreveu em alguma fala da conversa (telefone comparado só pelos dígitos); campos preenchidos pelo modelo com outros valores, como o contato da loja na ficha, são descartados antes da chamada. Não faz nova chamada ao modelo |
 
 Resposta segura: "Opa, me enrolei aqui pra confirmar essa informação. Pode reformular a pergunta, ou prefere que eu chame alguém da equipe?"
 
 ### 9.3 Parâmetros do modelo
-`temperature` 0,3; `max_tokens` 800; `tool_choice` automático. `LLM_EXTRA_BODY` (JSON opcional) repassado como `extra_body`, para desligar raciocínio quando o servidor precisar (definido no teste de fumaça da E0). No LM Studio, `{"reasoning_effort": "none"}` reduziu o turno do Qwen3-14B de 4 a 15 s para 1 a 4 s; a E5 compara os dois modos com os casos de avaliação. O modelo é carregado com contexto de 16.384 tokens. Resposta final vazia (por exemplo, raciocínio cortado por `max_tokens`) recebe a mesma única correção do G2.
+`temperature` 0,3; `max_tokens` 3000 (com o raciocínio ligado, 800 esgotava antes da resposta e gerava resposta vazia); `tool_choice` automático. `LLM_EXTRA_BODY` (JSON opcional) repassado como `extra_body`, para desligar raciocínio quando o servidor precisar (definido no teste de fumaça da E0). No LM Studio, `{"reasoning_effort": "none"}` reduziu o turno do Qwen3-14B de 4 a 15 s para 1 a 4 s; a E5 compara os dois modos com os casos de avaliação. O modelo é carregado com contexto de 16.384 tokens. Resposta final vazia (por exemplo, raciocínio cortado por `max_tokens`) recebe a mesma única correção do G2.
 
 ## 10. Memória e sessão
 
@@ -564,19 +566,16 @@ Comparações de texto sem diferenciar maiúsculas, acentos, marcações de mark
 ### 13.3 Métricas e relatório
 `uv run emporio-evals --modelo <nome> --rotulo <rotulo>` (opções `--extra-body`, `--temperatura`, `--casos`, `--so`, `--saida`) grava `evals/reports/<rotulo>.md` e `.json` com: acerto de roteamento (ferramentas esperadas chamadas), taxa de asserções aprovadas, violações e correções de G2, latência p50 e p95 por turno, falhas por caso com a resposta obtida. Os relatórios finais são versionados.
 
-### 13.4 Resultado da etapa E5
-Uma execução de cada configuração, com o prompt final e temperatura 0,3 (relatórios em `evals/reports/`):
+### 13.4 Resultado final da avaliação
+Uma execução de cada configuração, com o prompt e os guardrails finais, data de referência 2026-03-25T10:30:00-04:00 e temperatura 0,3 (relatórios `*-final` em `evals/reports/`):
 
 | Configuração | Roteamento | Asserções | Casos | Latência p50 / p95 |
 |---|---|---|---|---|
-| Qwen3-14B com raciocínio | 24/24 | 126/130 | 28/32 | 14,3 s / 20,9 s |
-| Qwen3-14B com raciocínio, com G6 e G7 | 22/24 | 120/130 | 28/32 | 14,9 s / 30,5 s |
-| Qwen3-14B com raciocínio, com G8 e G9 | 24/24 | 128/130 | 30/32 | 14,9 s / 26,4 s |
-| Qwen3-14B com raciocínio, com G8 a G12 (padrão) | 24/24 | 130/130 | 32/32 | 14,3 s / 36,0 s |
-| gpt-oss-20b, esforço baixo | 23/24 | 123/130 | 26/32 | 6,3 s / 11,2 s |
-| Qwen3-14B sem raciocínio | 18/24 | 117/130 | 25/32 | 4,6 s / 9,0 s |
+| Qwen3-14B com raciocínio (padrão) | 23/24 | 128/130 | 31/32 | 14,0 s / 28,1 s |
+| gpt-oss-20b, esforço baixo | 23/24 | 125/130 | 28/32 | 6,0 s / 12,1 s |
+| Qwen3-14B sem raciocínio | 21/24 | 123/130 | 28/32 | 4,4 s / 9,5 s |
 
-Escolhido o Qwen3-14B com raciocínio (padrão do `.env.example`). A configuração mais rápida segue disponível por `LLM_EXTRA_BODY`. A variação entre execuções é de um ou dois casos; o caso ped-07 teve a redação dos turnos ajustada após a primeira execução e o comparador passou a tratar hifens tipográficos como hífen; ambos os ajustes estão declarados no README (seção 6.2).
+Escolhido o Qwen3-14B com raciocínio (padrão do `.env.example`) por correção das respostas; a configuração mais rápida segue disponível por `LLM_EXTRA_BODY`. A variação entre execuções é de um a dois casos; os ajustes de caso (ped-07, hifens tipográficos, sinônimos em pol-02, ped-02 e pag-04) estão declarados no README (seção 6.2). A evolução do Qwen3-14B com cada guardrail (G6 a G12) está no README, seção 6.1.
 
 ### 13.5 Testes end-to-end
 `tests/e2e/` (pytest-playwright, marcador `e2e`, fora da execução padrão do `pytest`). O servidor é o de produção com `criar_app`; só o LLM é trocado por `LLMDeRoteiro`, que escolhe a ferramenta por palavras-chave e redige a resposta com os dados das ferramentas reais. Seletores por papel, rótulo e texto visível, sem esperas fixas. Um fluxo marcado `real` usa o modelo local (`E2E_MODELO_REAL=1`). Navegador: Edge instalado (`E2E_CANAL`), sem baixar binários; vídeo desligado pelo mesmo motivo.
@@ -727,7 +726,7 @@ Commit final: `docs: README final`.
 |---|---|
 | Runtime não reconhece a RX 9070 | LM Studio com Vulkan; em último caso, modelo de 8B em CPU para desenvolver e API compatível para os evals, registrando a troca |
 | Tool calling instável no modelo local | Enums em vez de texto livre, descrições curtas, temperatura baixa, erro de argumento devolvido ao modelo; trocar de candidato na E5 |
-| Latência alta | Prompt enxuto, histórico cortado, `max_tokens` 800, raciocínio desligado |
+| Latência alta | Prompt enxuto, histórico cortado, `max_tokens` 3000, raciocínio desligado quando a latência for prioridade |
 | Parsing do PDF quebra tabelas | Pós-processamento com regra explícita; teste das tabelas |
 | Falta de tempo | Cortar nesta ordem: itens P2 da E6; persistência da verificação na sessão (6.11); limite de tentativas; correção automática da G2 (manter só a detecção) |
 

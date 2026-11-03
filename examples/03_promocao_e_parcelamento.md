@@ -8,7 +8,7 @@ Produto em promoção, com preço original, percentual e preço final, parcelame
 | Parâmetros extras (`LLM_EXTRA_BODY`) | nenhum (raciocínio do modelo ligado) |
 | Temperatura | 0.3 |
 | Data de referência | 25/03/2026, quarta-feira, 10h30 (loja aberta) |
-| Gerado em | 03/11/2026 12:24 |
+| Gerado em | 03/11/2026 16:24 |
 
 Conversa gerada por `scripts/gerar_exemplos.py`, sem edição manual das respostas.
 
@@ -20,14 +20,17 @@ Cliente:
 
 Riff:
 
-> O Kalani KAL-700T está com **10% de desconto** (R$ 359,00 → R$ 323,10).  
-> Parcelado no cartão, fica até **4x de R$ 80,78**.  
+> O Kalani KAL-700T está com **desconto de 10%**: de **R$ 359,00** por **R$ 323,10**. Parcelado no cartão:  
+> - 1x R$ 323,10  
+> - 2x R$ 161,55  
+> - 3x R$ 107,70  
+> - 4x R$ 80,78  
 >
-> Para calcular o frete, me diz a cidade onde você quer receber? 🎸
+> No PIX também fica por **R$ 323,10**. Quer que eu calcule o frete? É só me dizer a cidade 😎🎸
 
 Ferramentas chamadas: `detalhes_produto({"produto": "Kalani KAL-700T"})`, `simular_compra({"produtos": [{"id": 127, "quantidade": 1}]})`.
 
-Latência: 27.4 s.
+Latência: 30.8 s. Correções automáticas da resposta: 1.
 
 ## Turno 2
 
@@ -37,8 +40,10 @@ Cliente:
 
 Riff:
 
-> O Kalani KAL-700T está com **R$ 359,00 (10% de desconto)** no preço promocional de **R$ 323,10**. O PIX não oferece desconto adicional nesse caso, mas você pode pagar com PIX normalmente. Quer que eu ajude a finalizar a compra? 🎸
+> O Kalani KAL-700T está com **desconto de 10%**: de **R$ 359,00** por **R$ 323,10**. O valor promocional já vale para pagamento no PIX ou cartão — não há desconto adicional nesse caso.  
+>
+> Se quiser, posso te ajudar a calcular o frete ou sugerir outras opções de ukulele 😎🎸
 
 Ferramentas chamadas: nenhuma.
 
-Latência: 12.7 s. Correções automáticas da resposta: 1.
+Latência: 14.4 s. Correções automáticas da resposta: 1.
