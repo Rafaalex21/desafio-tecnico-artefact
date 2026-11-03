@@ -54,7 +54,7 @@ flowchart LR
 
 ### 2.2 Preparação do modelo local
 
-No LM Studio, baixe o modelo `qwen3-14b` (quantização Q4_K_M), carregue-o com contexto de 32 mil tokens e ative o servidor local na porta 1234. No Ollama, o equivalente é:
+No LM Studio, baixe o modelo `qwen3-14b` (quantização Q4_K_M), carregue-o com contexto de 16 mil tokens e ative o servidor local na porta 1234. No Ollama, o equivalente é:
 
 ```bash
 ollama pull qwen3:14b
@@ -88,7 +88,7 @@ Testes unitários e avaliação do agente:
 
 ```bash
 uv run pytest
-uv run emporio-evals --modelo qwen3-14b
+uv run emporio-evals --modelo qwen3-14b --rotulo qwen3-14b-com-raciocinio --saida evals/reports
 ```
 
 ### 2.4 Configuração
@@ -98,7 +98,7 @@ uv run emporio-evals --modelo qwen3-14b
 | `LLM_BASE_URL` | `http://localhost:1234/v1` | Endpoint compatível com OpenAI |
 | `LLM_MODEL` | `qwen3-14b` | Identificador do modelo no servidor |
 | `LLM_API_KEY` | `local` | Ignorada por servidores locais; obrigatória em provedores pagos |
-| `LLM_EXTRA_BODY` | vazio | Parâmetros adicionais em JSON, usados para desligar o modo de raciocínio quando o servidor exige |
+| `LLM_EXTRA_BODY` | vazio | Parâmetros adicionais em JSON repassados ao servidor. Vazio mantém o raciocínio do Qwen3 ligado; `{"reasoning_effort": "none"}` o desliga e `{"reasoning_effort": "low"}` ajusta o esforço do gpt-oss-20b |
 | `AGORA_REFERENCIA` | `2026-03-25T10:30:00-04:00` | Data e hora que o agente considera como "agora"; vazio usa o relógio real |
 
 A variável `AGORA_REFERENCIA` merece nota. A base de pedidos termina em 22/03/2026, e com o relógio real todos os pedidos pendentes pareceriam parados há meses, além de todos os prazos de troca estarem vencidos. O arquivo de exemplo fixa, por isso, uma data três dias após o último pedido, a mesma usada nas avaliações e nas conversas de exemplo.
@@ -115,7 +115,9 @@ O ciclo de function calling foi implementado diretamente sobre o SDK `openai`, e
 
 ### 3.3 Modelo e provedor
 
-Optou-se por modelos locais, executados em uma AMD Radeon RX 9070 com 16 GB de memória de vídeo. Os candidatos foram o Qwen3-14B e o gpt-oss-20b, ambos com suporte consistente a chamadas de ferramenta, bom desempenho em português e tamanho compatível com a memória disponível com folga para 32 mil tokens de contexto. A escolha final entre eles baseou-se nos resultados do conjunto de avaliação (seção 6). No Windows, o suporte da arquitetura RDNA4 mostrou-se mais estável pelo backend Vulkan do llama.cpp, o que motivou o uso do LM Studio. Como todo o acesso ao modelo passa por uma API compatível com a da OpenAI, a troca de provedor exige apenas alterar variáveis de ambiente.
+Optou-se por modelos locais, executados em uma AMD Radeon RX 9070 com 16 GB de memória de vídeo. Os candidatos foram o Qwen3-14B (quantização Q4_K_M) e o gpt-oss-20b (MXFP4), ambos com suporte a chamadas de ferramenta e tamanho compatível com a memória disponível, com contexto de 16 mil tokens. No Windows, o suporte da arquitetura RDNA4 mostrou-se mais estável pelo backend Vulkan do llama.cpp, o que motivou o uso do LM Studio.
+
+A escolha baseou-se nas três configurações medidas com o conjunto de avaliação da seção 6. O Qwen3-14B com raciocínio ligado obteve o melhor desempenho em todas as métricas de qualidade, com roteamento perfeito de ferramentas e acerto nas seis questões de política, ao custo de uma latência mediana de 14,3 s por turno. Com o raciocínio desligado, a latência caiu para 4,6 s, mas o acerto de roteamento ficou em 75,0%, pois o modelo passou a responder de memória a perguntas que exigiam consulta (parcelamento, prazos de frete, reclamações). O gpt-oss-20b com esforço de raciocínio baixo ficou em posição intermediária: 95,8% de roteamento e 6,3 s de latência mediana, mas com falhas recorrentes que o Qwen3-14B com raciocínio não apresentou, como tratar a pergunta sobre o funcionamento de uma troca como reclamação. Adotou-se o Qwen3-14B com raciocínio como padrão, por privilegiar a correção das respostas sobre a velocidade, já que um preço ou prazo incorreto custa mais ao cliente do que alguns segundos de espera, que a interface compensa com o indicador de atividade (seção 3.7). A configuração mais rápida permanece disponível por variável de ambiente (seção 2.4). Como todo o acesso ao modelo passa por uma API compatível com a da OpenAI, a troca de provedor exige apenas alterar variáveis de ambiente.
 
 ### 3.4 Arquitetura de recuperação
 
@@ -204,9 +206,31 @@ O manual declara conformidade com a LGPD, e o agente respeita esse compromisso n
 
 ## 6. Avaliação
 
-O comportamento do agente é medido por um conjunto de cerca de trinta casos em `evals/cases.yaml`, distribuídos entre catálogo, pagamento, políticas, pedidos e escopo. Cada caso define as mensagens do cliente, as ferramentas que devem ser chamadas e asserções sobre o texto da resposta (termos obrigatórios e proibidos, comparados sem distinção de maiúsculas e acentos). Entre os casos estão as armadilhas descritas na seção 5, como o produto descontinuado com estoque, a descrição de marca trocada e a consulta de pedido com verificação incorreta. O executor registra a taxa de acerto no roteamento de ferramentas, a taxa de asserções aprovadas, as intervenções do verificador de valores monetários e a latência por turno, gravando um relatório por modelo em `evals/reports/`.
+O comportamento do agente é medido por 32 casos em `evals/cases.yaml`, distribuídos entre catálogo (11), pagamento (4), políticas (6), pedidos (7) e escopo (4). Cada caso define as mensagens do cliente, as ferramentas que devem ser chamadas e asserções sobre o texto da resposta (termos obrigatórios e proibidos, comparados sem distinção de maiúsculas, acentos, marcações de formatação e tipo de hífen). As asserções valem para o último turno do caso. Entre os casos estão as armadilhas descritas na seção 5, como o produto descontinuado com estoque, a descrição de marca trocada e a consulta de pedido com verificação incorreta. O executor (`uv run emporio-evals`) registra a taxa de acerto no roteamento de ferramentas, calculada sobre os 24 casos que fixam as ferramentas esperadas, a taxa de asserções aprovadas, as intervenções do verificador de valores monetários, as respostas seguras e a latência por turno, e grava um relatório por configuração em `evals/reports/`.
 
 O conjunto tem duas funções: fundamentar a escolha do modelo em desempenho medido e servir de teste de regressão a cada alteração do prompt ou das descrições das ferramentas.
+
+### 6.1 Resultados
+
+Os números abaixo vêm de uma execução de cada configuração, com o prompt e as ferramentas na versão final e temperatura 0,3. Os relatórios completos, com a resposta obtida em cada falha, estão em `evals/reports/`.
+
+| Configuração | Roteamento | Asserções | Casos aprovados | Latência p50 | Latência p95 |
+|---|---|---|---|---|---|
+| Qwen3-14B com raciocínio (padrão) | 24/24 (100,0%) | 126/130 (96,9%) | 28/32 (87,5%) | 14,3 s | 20,9 s |
+| gpt-oss-20b, esforço baixo | 23/24 (95,8%) | 123/130 (94,6%) | 26/32 (81,2%) | 6,3 s | 11,2 s |
+| Qwen3-14B sem raciocínio | 18/24 (75,0%) | 117/130 (90,0%) | 25/32 (78,1%) | 4,6 s | 9,0 s |
+
+Nenhuma configuração acionou a resposta segura do verificador de valores monetários, e apenas o Qwen3-14B sem raciocínio precisou de uma correção. O critério de aceite de 90% de acerto de roteamento foi atendido pelo Qwen3-14B com raciocínio e pelo gpt-oss-20b.
+
+### 6.2 Leitura dos resultados e limites da medição
+
+A variação entre execuções é relevante: durante o desenvolvimento, o Qwen3-14B sem raciocínio oscilou entre 18 e 21 acertos de roteamento, e o gpt-oss-20b entre 25 e 27 casos aprovados, com prompts equivalentes. Diferenças de um ou dois casos entre configurações não são, portanto, conclusivas; a diferença no roteamento do Qwen3-14B sem raciocínio é a única que se manteve em todas as execuções.
+
+Algumas falhas do modelo escolhido são reais. No caso ped-04, a resposta sobre arrependimento de um pedido com prazo vencido não menciona que a garantia legal continua válida até 18/05/2026. No caso pag-01, o preço original da promoção é omitido ao falar das parcelas, contrariando a regra de apresentar preço original, percentual e preço final. Outras falhas são falsos negativos léxicos da avaliação, em que a resposta está correta mas não contém o termo esperado: esc-01 (a resposta recusa o pedido de cordas sem a palavra "instrumento") e, em outras configurações, cat-05 e pol-02. Esses casos foram mantidos como escritos, para não ajustar a medição ao resultado.
+
+Dois ajustes foram feitos nos próprios casos após a primeira execução, e ambos são declarados aqui. O caso ped-07, que testa o bloqueio após três verificações malsucedidas, passou a repetir, em cada tentativa, a mesma frase completa com um e-mail diferente, pois a versão inicial, com mensagens curtas como "tente com teste2", levava o modelo a responder sem chamar a ferramenta. Mesmo com a nova redação, o Qwen3-14B com raciocínio reproduziu a mensagem de falha na terceira tentativa sem consultar o pedido, de modo que o bloqueio não chegou a ser acionado e a quarta tentativa, com o e-mail correto, foi atendida. A falha desse caso mostra que o contador de tentativas depende de o modelo chamar a ferramenta. Além disso, o comparador de texto passou a tratar hifens tipográficos como hífen comum, porque o gpt-oss-20b os emite em nomes de produto ("GF‑3D"), o que reprovava respostas corretas.
+
+Por fim, os casos foram escritos pelo próprio autor, que conhecia as armadilhas dos dados, e cada um é executado uma única vez por configuração. Os números servem para comparar configurações e detectar regressões, não como estimativa de desempenho em atendimentos reais.
 
 ## 7. Exemplos de interação
 

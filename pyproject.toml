@@ -27,7 +27,7 @@ dev = [
 emporio-etl = "emporio.etl.__main__:main"
 emporio-chat = "emporio.cli:main"
 emporio-web = "emporio.web.app:main"
-emporio-evals = "evals.run:main"
+emporio-evals = "emporio.evals.run:main"
 
 [build-system]
 requires = ["hatchling"]

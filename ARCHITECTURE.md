@@ -117,7 +117,7 @@ O agente é um loop de function calling. O system prompt traz a persona, as regr
 | D1 | Abordagem do agente | Function calling com 6 ferramentas tipadas | Text-to-SQL, ReAct textual, RAG puro | Regras de negócio determinísticas, sem SQL gerado por modelo de 14B, sem acesso irrestrito à tabela de clientes |
 | D2 | Orquestração | Loop próprio sobre o SDK `openai` (cerca de 150 linhas) | LangGraph, PydanticAI, smolagents | Transparência total do fluxo, controle sobre particularidades de modelos locais (blocos de raciocínio, chamadas paralelas), nenhuma abstração a justificar |
 | D3 | Runtime do LLM | LM Studio com runtime Vulkan; Ollama se reconhecer a GPU | vLLM, llama.cpp puro | RDNA4 no Windows tem suporte mais estável via Vulkan; ambos expõem API compatível com OpenAI |
-| D4 | Modelo | Candidatos: Qwen3-14B (instruct, quantização Q4_K_M) e gpt-oss-20b. Escolha final pelos números da etapa E5 | Modelos maiores com offload para RAM | Cabem em 16 GB com contexto de 32k; ambos têm bom suporte a tool calling e português |
+| D4 | Modelo | Candidatos: Qwen3-14B (instruct, quantização Q4_K_M) e gpt-oss-20b. Escolhido o Qwen3-14B com raciocínio ligado, pelos números da etapa E5 (seção 13.4) | Modelos maiores com offload para RAM | Cabem em 16 GB com contexto de 16k; ambos têm bom suporte a tool calling e português |
 | D5 | Recuperação das políticas | Consulta por tópico: a ferramenta recebe tópicos de um enum e devolve as seções correspondentes do manual | Busca vetorial, busca híbrida com reranker, manual inteiro no prompt | Manual de 8 páginas com seções numeradas: a estrutura já resolve a recuperação com exatidão; manter como ferramenta deixa visível quando o agente consulta políticas (R3) |
 | D6 | Fatos fixos | Ficha da loja (endereço, contatos, horários) e estado aberto/fechado no system prompt | Tudo via ferramenta | Informação curta e usada o tempo todo; o estado da loja é calculado, não inferido |
 | D7 | Armazenamento | SQLite (biblioteca padrão), gerado a partir dos CSVs | pandas em memória, DuckDB, Postgres | Sem servidor, consultas parametrizadas, o mesmo motor serve o histórico de conversas |
@@ -300,7 +300,9 @@ Parâmetros: `termo` (texto, opcional), `categoria` (enum com os 9 nomes, opcion
 
 Comportamento: filtros em SQL sobre a visão `catalogo`; se houver `termo`, pontuação com `rapidfuzz` (máximo entre `token_set_ratio` e `partial_ratio` sobre `texto_busca` normalizado), corte em 70. Por padrão só `disponivel`.
 
-Saída: `{total_encontrado, exibidos, categoria_sem_itens, produtos: [{id, nome, categoria, preco, promocao: {percentual, preco_promocional} | null, disponibilidade}]}`.
+Saída: `{total_encontrado, exibidos, categoria_sem_itens, indisponiveis_correspondentes: [{id, nome, disponibilidade}], produtos: [{id, nome, categoria, preco, promocao: {percentual, preco_promocional} | null, disponibilidade}]}`.
+
+`indisponiveis_correspondentes` traz até 3 itens esgotados, descontinuados ou em breve cuja pontuação é maior ou igual à do melhor item disponível (e acima do corte). Sem ele, quem pergunta por um modelo descontinuado receberia só vizinhos disponíveis e o agente diria que o produto não existe; o prompt manda chamar `detalhes_produto` nesses itens.
 
 O termo é comparado em duas grafias, com pontuação como espaço e colado (`gd-20` e `gd20`). Categoria desconhecida devolve o erro `categoria_invalida` com a lista das válidas; o enum do esquema é montado a partir do banco.
 
@@ -320,7 +322,7 @@ Testes: 113 traz ao menos uma alternativa "7 Cordas"; 135 vem com `descricao: nu
 ### 7.3 `simular_compra`
 Parâmetros: `produtos` (lista de `{id, quantidade}`), `cidade_entrega` (opcional).
 
-Saída: `{itens, subtotal, total_pix, opcoes_cartao: [{parcelas, valor_parcela}], parcelas_maximas, combinacao_permitida, frete: {tipo, valor | null, prazo, observacao}}`. Itens indisponíveis geram erro `produto_indisponivel` com a disponibilidade. Quantidade acima do estoque gera `estoque_insuficiente`, sem revelar o saldo. Itens repetidos são somados. Parcelamento e frete se calculam sobre o subtotal (preço final com promoção); o PIX é calculado item a item e a saída traz também `economia_pix`.
+Saída: `{itens, subtotal, total_pix, opcoes_cartao: [{parcelas, valor_parcela}], parcelas_maximas, combinacao_permitida, frete: {tipo, valor | null, prazo, observacao}}`. Itens indisponíveis geram erro `produto_indisponivel` com a disponibilidade. Quantidade acima do estoque gera `estoque_insuficiente`, sem revelar o saldo. Itens repetidos são somados. Cada item traz `preco_tabela`, o preço de lista sem promoção, para o agente citar preço original, percentual e preço final juntos. Parcelamento e frete se calculam sobre o subtotal (preço final com promoção); o PIX é calculado item a item e a saída traz também `economia_pix`.
 
 ### 7.4 `consultar_pedido`
 Parâmetros: `numero_pedido` (inteiro, opcional), `email` (opcional), `telefone` (opcional).
@@ -485,8 +487,8 @@ LLM_MODEL=qwen3-14b
 LLM_API_KEY=local                          # servidores locais ignoram; APIs pagas exigem
 LLM_TEMPERATURE=0.3
 LLM_TIMEOUT_S=120
-# JSON opcional repassado ao servidor. No LM Studio, desliga o raciocínio do Qwen3 (turno de 1 a 4 s).
-LLM_EXTRA_BODY={"reasoning_effort": "none"}
+# JSON opcional repassado ao servidor; vazio mantém o raciocínio do Qwen3 ligado (padrão). {"reasoning_effort": "none"} o desliga.
+LLM_EXTRA_BODY=
 AGORA_REFERENCIA=2026-03-25T10:30:00-04:00 # vazio = relógio real
 HISTORY_MAX_TOKENS=6000
 DB_PATH=data/processed/emporio.db
@@ -507,13 +509,14 @@ O `.env.example` vem com `AGORA_REFERENCIA` preenchida porque a base termina em 
   turnos:
     - "Quais opções de violões disponíveis custando até R$1000?"
   espera:
-    ferramentas: [buscar_produtos]   # chamadas no último turno, em qualquer ordem
+    ferramentas: [buscar_produtos]   # todas chamadas no último turno, em qualquer ordem
+    ferramentas_alguma: []           # ao menos uma destas foi chamada
     ferramentas_proibidas: []
     contem_todos: ["Yamaha C40"]
-    contem_algum: []
+    contem_algum: []                 # lista simples, ou lista de listas (cada grupo exige uma ocorrência)
     nao_contem: ["GF-3D", "SN-7C"]
 ```
-Comparações de texto sem diferenciar maiúsculas e acentos. Violações de G2 contam automaticamente.
+Comparações de texto sem diferenciar maiúsculas, acentos, marcações de markdown, tipo de hífen e espaço depois de `R$`. As asserções valem para o último turno. Resposta segura (G1 ou G2) reprova o caso.
 
 ### 13.2 Casos mínimos
 | ID | Turnos | Esperado |
@@ -550,7 +553,18 @@ Comparações de texto sem diferenciar maiúsculas e acentos. Violações de G2 
 | esc-04 | O violão chegou riscado, quero reclamar | `encaminhar_atendente`; 24 horas úteis; sem gíria |
 
 ### 13.3 Métricas e relatório
-`uv run emporio-evals --modelo <nome>` grava `evals/reports/<modelo>.md` e `.json` com: acerto de roteamento (ferramentas esperadas chamadas), taxa de asserções aprovadas, violações e correções de G2, latência p50 e p95 por turno, falhas por caso com a resposta obtida. Os relatórios finais são versionados.
+`uv run emporio-evals --modelo <nome> --rotulo <rotulo>` (opções `--extra-body`, `--temperatura`, `--casos`, `--so`, `--saida`) grava `evals/reports/<rotulo>.md` e `.json` com: acerto de roteamento (ferramentas esperadas chamadas), taxa de asserções aprovadas, violações e correções de G2, latência p50 e p95 por turno, falhas por caso com a resposta obtida. Os relatórios finais são versionados.
+
+### 13.4 Resultado da etapa E5
+Uma execução de cada configuração, com o prompt final e temperatura 0,3 (relatórios em `evals/reports/`):
+
+| Configuração | Roteamento | Asserções | Casos | Latência p50 / p95 |
+|---|---|---|---|---|
+| Qwen3-14B com raciocínio | 24/24 | 126/130 | 28/32 | 14,3 s / 20,9 s |
+| gpt-oss-20b, esforço baixo | 23/24 | 123/130 | 26/32 | 6,3 s / 11,2 s |
+| Qwen3-14B sem raciocínio | 18/24 | 117/130 | 25/32 | 4,6 s / 9,0 s |
+
+Escolhido o Qwen3-14B com raciocínio (padrão do `.env.example`). A configuração mais rápida segue disponível por `LLM_EXTRA_BODY`. A variação entre execuções é de um ou dois casos; o caso ped-07 teve a redação dos turnos ajustada após a primeira execução e o comparador passou a tratar hifens tipográficos como hífen; ambos os ajustes estão declarados no README (seção 6.2).
 
 ## 14. Estrutura do repositório
 
@@ -575,7 +589,7 @@ emporio-da-musica-agente/
 │   ├── agent/                # llm.py, tools.py, loop.py, guardrails.py, memory.py, prompts/system.md
 │   ├── cli.py
 │   └── web/                  # app.py, static/index.html, static/styles.css, static/app.js
-├── evals/                    # cases.yaml, run.py, reports/
+├── evals/                    # cases.yaml, reports/ (o executor fica em src/emporio/evals/)
 ├── examples/                 # conversas .md e capturas
 ├── scripts/                  # smoke_llm.py, gerar_exemplos.py, painel_payload.py
 └── tests/
@@ -642,7 +656,7 @@ Commit final: `feat(agente): loop de function calling, persona e CLI`.
 
 ### E5. Avaliação e escolha do modelo (dia 2, 3h, P0)
 Seções: 0.3, 13.
-- `evals/cases.yaml` com os casos da 13.2; `evals/run.py`.
+- `evals/cases.yaml` com os casos da 13.2; executor em `src/emporio/evals/` (`casos.py`, `run.py`).
 - Rodar os dois candidatos; registrar números no painel.
 - Iterar prompt e descrições de ferramentas até estabilizar; nunca ajustar casos para passar.
 - Acrescentar ao README a tabela de resultados e a escolha final do modelo.
