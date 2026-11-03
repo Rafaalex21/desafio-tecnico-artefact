@@ -2,7 +2,7 @@
 
 Este repositório contém o protótipo de um agente conversacional de atendimento ao cliente para a Empório da Música, loja fictícia de instrumentos musicais sediada em Campo Grande (MS), desenvolvido como resposta ao desafio técnico para a posição de AI Engineer da Artefact. O agente conversa em português, adota a persona de um atendente com afinidade pelo rock, consulta catálogo, pedidos e políticas da loja por meio de ferramentas determinísticas e opera com modelos de linguagem executados localmente.
 
-A especificação completa, que orientou a implementação etapa por etapa, encontra-se em [ARCHITECTURE.md](ARCHITECTURE.md).
+A especificação completa, que orientou a implementação etapa por etapa, encontra-se em [ARCHITECTURE.md](ARCHITECTURE.md). Uma versão deste documento em PDF está em [README.pdf](README.pdf).
 
 ## Sumário
 
@@ -99,6 +99,12 @@ uv run python scripts/anonimizar_relatorio_e2e.py
 ```
 
 Para repetir um fluxo contra o modelo local de verdade, defina `E2E_MODELO_REAL=1` com o servidor de modelos ligado e rode `uv run pytest tests/e2e -m "e2e and real"`.
+
+O `README.pdf` é gerado a partir deste arquivo, com o navegador já instalado e a biblioteca `markdown`, que não faz parte das dependências do projeto:
+
+```bash
+uv run --with markdown python scripts/gerar_readme_pdf.py
+```
 
 ### 2.4 Configuração
 
@@ -302,7 +308,7 @@ As limitações abaixo decorrem do prazo, das lacunas dos dados ou de escolhas c
 | Observabilidade | Sem rastreamento estruturado das execuções | Traces com OpenTelemetry ou Langfuse, com latência e falhas por ferramenta |
 | Recuperação | Adequada ao corpus atual | Critérios de evolução descritos na seção 4 |
 | Latência | Com o modelo padrão, 14 s por turno em mediana e até 36 s no percentil 95, no hardware de desenvolvimento (seção 6.1); aceitável para um protótipo, longa para um atendimento real | Modelo menor ou provedor remoto para as perguntas simples, mantendo o modelo atual para pedidos e reclamações |
-| Variação do modelo | O Qwen3-14B oscila entre execuções: respostas ocasionalmente incompletas (por exemplo, sem a data da garantia ou sem o status de envio) e, com raciocínio ligado, às vezes sem consultar a ferramenta. Cada guardrail corrige uma única vez por turno | Amostragem repetida na avaliação, com taxa de aprovação por caso, e verificação de completude por tipo de pergunta |
+| Variação do modelo | O Qwen3-14B oscila entre execuções: respostas ocasionalmente incompletas (por exemplo, sem a data da garantia ou sem o status de envio) e, com raciocínio ligado, às vezes sem consultar a ferramenta. Também há ofertas fora do que a loja vende, como "ajuda para escolher acessórios" ao final de uma resposta de preço. Cada guardrail corrige uma única vez por turno | Amostragem repetida na avaliação, com taxa de aprovação por caso, e verificação de completude por tipo de pergunta |
 | Pergunta sobre troca tratada como reclamação | Perguntas como "produto com defeito, como funciona a troca?" às vezes são encaminhadas a um atendente em vez de respondidas pelas políticas (caso pol-03) | Classificar a intenção em etapa própria, antes da escolha de ferramentas, ou exemplos no prompt |
 | Critérios de avaliação | A comparação é lexical, o que gera falsos negativos com respostas corretas e exigiu ampliar três critérios (seção 6.2) | Avaliação semântica por um modelo juiz, validada contra uma amostra anotada à mão |
 
