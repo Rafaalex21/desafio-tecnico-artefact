@@ -23,7 +23,9 @@ RESPOSTA_SEGURA = (
 _VALOR = re.compile(r"R\$\s*(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?")
 _RACIOCINIO = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 _RACIOCINIO_ABERTO = re.compile(r"<think>.*", re.DOTALL | re.IGNORECASE)
-_PARCELAMENTO = re.compile(r"parcel|prest[aã]|\b\d{1,2}\s*x\b|\bvezes\b|cart[aã]o", re.IGNORECASE)
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+_TELEFONE = re.compile(r"(?:\+?55\s*)?\(?\d{2}\)?\s*9?\d{4}[-\s]?\d{4}")
+_PARCELAMENTO = re.compile(r"(?i:parcel|prest[aã]|\bvezes\b|cart[aã]o)|\b\d{1,2}\s*x\b")
 
 
 def limpar_entrada(texto: str) -> str:
@@ -172,9 +174,60 @@ AVISO_DE_PARCELAMENTO = (
 )
 
 
+def pedido_sem_consulta(turno: list[dict[str, Any]]) -> bool:
+    """G8: o cliente deu número do pedido e e-mail ou telefone e o agente respondeu sem chamar `consultar_pedido`."""
+    if not turno:
+        return False
+    fala = str(turno[0].get("content") or "")
+    if not re.search(r"pedido|compra", fala, re.IGNORECASE):
+        return False
+    contato = _EMAIL.search(fala) or _TELEFONE.search(fala)
+    numero = re.search(r"(?<![\d-])\d{1,6}(?![\d-])", _TELEFONE.sub(" ", _EMAIL.sub(" ", fala)))
+    chamadas = {c["function"]["name"] for m in turno for c in m.get("tool_calls") or []}
+    return bool(contato and numero) and "consultar_pedido" not in chamadas
+
+
+AVISO_DE_PEDIDO = (
+    "[aviso do sistema] O cliente já informou o número do pedido e um contato (e-mail ou telefone), o que basta. "
+    "Chame `consultar_pedido` agora, com os dados exatamente como ele escreveu, sem pedir mais nada, e responda "
+    "com base no resultado. Não mencione este aviso."
+)
+
+
+def entrega_atrasada_em(mensagens: list[dict[str, Any]]) -> bool:
+    def atrasado(dado: Any) -> bool:
+        if isinstance(dado, dict):
+            return dado.get("entrega_atrasada") is True or any(atrasado(v) for v in dado.values())
+        return isinstance(dado, list) and any(atrasado(v) for v in dado)
+
+    for mensagem in mensagens:
+        if mensagem.get("role") == "tool":
+            try:
+                if atrasado(json.loads(str(mensagem.get("content") or ""))):
+                    return True
+            except json.JSONDecodeError:
+                continue
+    return False
+
+
+def atraso_sem_oferta(texto: str, turno: list[dict[str, Any]]) -> bool:
+    """G9: pedido com entrega atrasada e a resposta não oferece encaminhar o caso à equipe."""
+    return entrega_atrasada_em(turno) and not re.search(r"encaminh|equipe|atendente", texto, re.IGNORECASE)
+
+
+AVISO_DE_ATRASO = (
+    "[aviso do sistema] O pedido está com a entrega atrasada. Reescreva a resposta mantendo o pedido de desculpas e "
+    "o rastreio, e pergunte se o cliente quer que você encaminhe o caso à equipe. Não mencione este aviso."
+)
+
+
 def reforco_de_resposta(texto: str, mensagens: list[dict[str, Any]], inicio_turno: int) -> str | None:
-    """G6 e G7: devolve o aviso de correção quando a resposta é válida mas incompleta, ou None se está boa."""
+    """G6 a G9: devolve o aviso de correção quando a resposta é válida mas incompleta, ou None se está boa."""
+    if pedido_sem_consulta(mensagens[inicio_turno:]):
+        return AVISO_DE_PEDIDO
     if parcelamento_sem_simulacao(mensagens[inicio_turno:]):
         return AVISO_DE_PARCELAMENTO
+    if atraso_sem_oferta(texto, mensagens[inicio_turno:]):
+        return AVISO_DE_ATRASO
     faltas = promocao_incompleta(texto, promocoes_nas_ferramentas(mensagens))
     return aviso_de_promocao(faltas) if faltas else None

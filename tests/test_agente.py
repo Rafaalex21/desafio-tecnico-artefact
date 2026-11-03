@@ -426,3 +426,61 @@ def test_g7_nao_age_sem_conversa_de_parcelas(memoria, config, fabrica):
     llm = LLMRoteirizado(chama("detalhes_produto", {"produto": "Takamine GD20"}), fala("Ele custa R$ 2.199,00."))
     resultado = agente(llm, memoria, config, fabrica).responder("s4", "Quanto custa o Takamine GD20?")
     assert resultado.reforcos == 0 and resultado.texto == "Ele custa R$ 2.199,00."
+
+
+def test_g8_pedido_sem_consulta_pede_consultar_pedido(memoria, config, fabrica):
+    email = "anacarol.ferreira@coldmail.com"
+    llm = LLMRoteirizado(
+        fala("Preciso do telefone cadastrado na compra."),
+        chama("consultar_pedido", {"numero_pedido": 8, "email": email}),
+        fala("Seu pedido saiu para entrega."),
+    )
+    pergunta = f"Qual o status do pedido 8? Meu e-mail é {email}"
+    resultado = agente(llm, memoria, config, fabrica).responder("s5", pergunta)
+    assert [c.nome for c in resultado.ferramentas] == ["consultar_pedido"]
+    assert resultado.texto == "Seu pedido saiu para entrega." and resultado.reforcos == 1
+    assert "consultar_pedido" in llm.chamadas[1][-1]["content"]
+
+
+@pytest.mark.parametrize(
+    "fala_do_cliente",
+    [
+        "Qual o status do pedido 8?",
+        "Quero ver meu pedido, meu e-mail é anacarol.ferreira@coldmail.com",
+        "Quanto custa o Takamine GD20? Meu e-mail é anacarol.ferreira@coldmail.com",
+        "Pedido 8, telefone (67) 98765-4321",
+    ],
+)
+def test_g8_so_age_com_numero_do_pedido_e_contato(fala_do_cliente):
+    turno = [{"role": "user", "content": fala_do_cliente}]
+    assert guardrails.pedido_sem_consulta(turno) is (fala_do_cliente == "Pedido 8, telefone (67) 98765-4321")
+
+
+def test_g8_nao_age_quando_a_ferramenta_foi_chamada():
+    turno = [
+        {"role": "user", "content": "Status do pedido 8, a.b@jmail.com"},
+        {"role": "assistant", "tool_calls": [{"id": "c", "function": {"name": "consultar_pedido", "arguments": "{}"}}]},
+    ]
+    assert guardrails.pedido_sem_consulta(turno) is False
+
+
+def test_g7_nao_confunde_nome_de_produto_com_parcelas():
+    turno = [
+        {"role": "user", "content": "Quero o baixo Ibanez Bass 2X"},
+        {"role": "assistant", "tool_calls": [{"id": "c", "function": {"name": "buscar_produtos", "arguments": "{}"}}]},
+    ]
+    assert guardrails.parcelamento_sem_simulacao(turno) is False
+    turno[0]["content"] = "Quero o Takamine GD20 em 12x"
+    assert guardrails.parcelamento_sem_simulacao(turno) is True
+
+
+def test_g9_atraso_sem_oferta_pede_encaminhamento(memoria, config, fabrica):
+    llm = LLMRoteirizado(
+        chama("consultar_pedido", {"numero_pedido": 8, "email": "anacarol.ferreira@coldmail.com"}),
+        fala("Sinto muito pelo atraso. O rastreio é BRJL5544332BR."),
+        fala("Sinto muito pelo atraso. O rastreio é BRJL5544332BR. Quer que eu encaminhe o caso à equipe?"),
+    )
+    pergunta = "Qual o status do pedido 8? Meu e-mail é anacarol.ferreira@coldmail.com"
+    resultado = agente(llm, memoria, config, fabrica).responder("s6", pergunta)
+    assert resultado.texto.endswith("à equipe?") and resultado.reforcos == 1
+    assert "encaminhe o caso" in llm.chamadas[-1][-1]["content"]

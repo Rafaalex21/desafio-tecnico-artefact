@@ -156,7 +156,7 @@
   turnos:
     - "Vocês abrem domingo?"
   espera:
-    contem_algum: ["fechad", "não abrimos", "não funcionamos", "não abre"]
+    contem_algum: ["fecha", "não abrimos", "não funcionamos", "não abre", "folga", "não atend"]
 
 - id: pol-03
   categoria: politicas
@@ -211,7 +211,7 @@
     ferramentas: [consultar_pedido]
     contem_todos: ["BRJL5544332BR"]
     contem_algum:
-      - ["enviado"]
+      - ["enviad", "despach", "postad", "a caminho", "trânsito"]
       - ["atras", "28/02", "previsão"]
       - ["encaminh", "equipe", "atendente"]
     nao_contem: ["anacarol.ferreira"]

@@ -439,6 +439,8 @@ Argumentos inválidos em uma tool call voltam ao modelo como erro de ferramenta 
 | G5 | Raciocínio vazado | Remove `<think>...</think>` e equivalentes antes de exibir |
 | G6 | Promoção completa | Se a resposta cita o preço promocional de um produto (busca, detalhes ou simulação), precisa trazer também o preço original e o percentual. Uma correção por turno; persistindo, a resposta segue como está |
 | G7 | Parcelamento simulado | Se o cliente falou de parcelas ou cartão, o agente consultou um produto (`detalhes_produto` ou `buscar_produtos`) e não chamou `simular_compra`, uma correção manda chamá-la sem pedir cidade. Compartilha com o G6 a única correção por turno |
+| G8 | Pedido sem consulta | Se a fala do cliente cita pedido ou compra, traz número e e-mail ou telefone e `consultar_pedido` não foi chamada no turno, uma correção manda chamá-la sem pedir mais dados. Compartilha a única correção por turno |
+| G9 | Atraso sem oferta | Se um resultado de ferramenta traz `entrega_atrasada` verdadeiro e a resposta não menciona encaminhar, equipe ou atendente, uma correção manda oferecer o encaminhamento. Compartilha a única correção por turno |
 
 Resposta segura: "Opa, me enrolei aqui pra confirmar essa informação. Pode reformular a pergunta, ou prefere que eu chame alguém da equipe?"
 
@@ -565,6 +567,8 @@ Uma execução de cada configuração, com o prompt final e temperatura 0,3 (rel
 | Configuração | Roteamento | Asserções | Casos | Latência p50 / p95 |
 |---|---|---|---|---|
 | Qwen3-14B com raciocínio | 24/24 | 126/130 | 28/32 | 14,3 s / 20,9 s |
+| Qwen3-14B com raciocínio, com G6 e G7 | 22/24 | 120/130 | 28/32 | 14,9 s / 30,5 s |
+| Qwen3-14B com raciocínio, com G8 e G9 (padrão) | 24/24 | 128/130 | 30/32 | 14,9 s / 26,4 s |
 | gpt-oss-20b, esforço baixo | 23/24 | 123/130 | 26/32 | 6,3 s / 11,2 s |
 | Qwen3-14B sem raciocínio | 18/24 | 117/130 | 25/32 | 4,6 s / 9,0 s |
 
