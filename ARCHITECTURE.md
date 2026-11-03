@@ -262,6 +262,8 @@ Com `hoje = agora().date()`, `recebimento = estimated_delivery` (S2), `compra = 
 | Garantia legal | 90 dias | recebimento | idem |
 | Garantia do fabricante | 6 meses a 2 anos | certificado do produto | texto fixo, sem cálculo |
 
+Cada direito traz também `situacao`, um texto pronto ("Prazo encerrado em 24/02/2026", "Dentro do prazo até 18/05/2026 (54 dias restantes)"): em teste com o Qwen3-14B, o booleano `elegivel` sozinho foi lido ao contrário.
+
 Itens não elegíveis (4.4) não são detectáveis nos dados; o agente menciona as exceções quando aplicar a política.
 
 Caso de teste: pedido 7 com hoje = 25/03/2026. Recebimento 17/02/2026: arrependimento até 24/02 (expirado), defeito até 05/03 (expirado), garantia legal até 18/05/2026 (vigente, 54 dias restantes).
@@ -282,7 +284,7 @@ Caso de teste: pedido 7 com hoje = 25/03/2026. Recebimento 17/02/2026: arrependi
 
 ## 7. Ferramentas do agente
 
-Definidas em `src/emporio/agent/tools.py` como modelos Pydantic, de onde saem os JSON Schemas enviados ao LLM. As descrições (em português) dizem ao modelo quando usar cada uma. Saídas são JSON compacto com `ensure_ascii=False`. Erros voltam como `{"erro": "<codigo>", "mensagem": "..."}`, nunca como exceção.
+Definidas em `src/emporio/agent/tools.py` como modelos Pydantic, de onde saem os JSON Schemas enviados ao LLM. As descrições (em português) dizem ao modelo quando usar cada uma. Campos opcionais enviados como `null`, texto vazio ou `numero_pedido` igual a 0 (hábito de modelos locais) valem como ausentes. Saídas são JSON compacto com `ensure_ascii=False`. Erros voltam como `{"erro": "<codigo>", "mensagem": "..."}`, nunca como exceção.
 
 | Ferramenta | Quando o modelo deve usar |
 |---|---|
@@ -437,11 +439,12 @@ Argumentos inválidos em uma tool call voltam ao modelo como erro de ferramenta 
 Resposta segura: "Opa, me enrolei aqui pra confirmar essa informação. Pode reformular a pergunta, ou prefere que eu chame alguém da equipe?"
 
 ### 9.3 Parâmetros do modelo
-`temperature` 0,3; `max_tokens` 800; `tool_choice` automático. `LLM_EXTRA_BODY` (JSON opcional) repassado como `extra_body`, para desligar raciocínio quando o servidor precisar (definido no teste de fumaça da E0).
+`temperature` 0,3; `max_tokens` 800; `tool_choice` automático. `LLM_EXTRA_BODY` (JSON opcional) repassado como `extra_body`, para desligar raciocínio quando o servidor precisar (definido no teste de fumaça da E0). No LM Studio, `{"reasoning_effort": "none"}` reduziu o turno do Qwen3-14B de 4 a 15 s para 1 a 4 s; a E5 compara os dois modos com os casos de avaliação. O modelo é carregado com contexto de 16.384 tokens. Resposta final vazia (por exemplo, raciocínio cortado por `max_tokens`) recebe a mesma única correção do G2.
 
 ## 10. Memória e sessão
 
-- `data/processed/conversas.db`: tabela `mensagens(session_id, seq, role, content, tool_calls_json, tool_call_id, criado_em)` com o formato OpenAI completo, inclusive mensagens de ferramenta; tabela `sessoes(session_id, criado_em, cliente_verificado_id, tentativas_verificacao)`.
+- `data/processed/conversas.db`: tabela `mensagens(session_id, seq, role, content, tool_calls_json, tool_call_id, criado_em)` com o formato OpenAI completo, inclusive mensagens de ferramenta; tabela `sessoes(session_id, criado_em, clientes_verificados, tentativas_verificacao)`, em que `clientes_verificados` é a lista JSON de clientes já verificados (uma sessão pode verificar mais de um titular).
+- Rascunhos que o guardrail G2 rejeitou e os avisos de correção não são gravados: o histórico guarda só a mensagem do cliente, as chamadas de ferramenta com seus resultados e a resposta final.
 - Corte do histórico: orçamento `HISTORY_MAX_TOKENS` (padrão 6.000, estimativa de 3,5 caracteres por token), removendo turnos completos mais antigos. Um turno é a mensagem do usuário e tudo até a próxima.
 - As ferramentas recebem um `ToolContext(session_id, agora, db, sessao)`.
 
@@ -482,7 +485,8 @@ LLM_MODEL=qwen3-14b
 LLM_API_KEY=local                          # servidores locais ignoram; APIs pagas exigem
 LLM_TEMPERATURE=0.3
 LLM_TIMEOUT_S=120
-LLM_EXTRA_BODY=                            # JSON opcional, ex.: {"reasoning_effort": "low"}
+# JSON opcional repassado ao servidor. No LM Studio, desliga o raciocínio do Qwen3 (turno de 1 a 4 s).
+LLM_EXTRA_BODY={"reasoning_effort": "none"}
 AGORA_REFERENCIA=2026-03-25T10:30:00-04:00 # vazio = relógio real
 HISTORY_MAX_TOKENS=6000
 DB_PATH=data/processed/emporio.db
