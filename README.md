@@ -289,6 +289,30 @@ O diretório [examples/](examples/) reúne conversas geradas por script a partir
 
 As capturas da tela de chat estão em [examples/captura_desktop_escuro.jpg](examples/captura_desktop_escuro.jpg) e [examples/captura_celular_claro.jpg](examples/captura_celular_claro.jpg).
 
+### 7.1 Capturas da tela de chat
+
+As capturas abaixo foram feitas na tela de chat, com o Qwen3-14B com raciocínio e a data de referência de 25/03/2026, em conversas independentes. Cada uma é uma única execução, sem edição.
+
+![Consulta de violões até R$ 1.000](examples/chat_01_catalogo.png)
+
+*Figura 1. Consulta de catálogo com faixa de preço: o agente lista os violões disponíveis e informa os dois modelos fora de venda, um esgotado e um descontinuado.*
+
+![Parcelamento do Takamine GD20](examples/chat_02_parcelamento.png)
+
+*Figura 2. Parcelamento: 12x sem juros de R$ 183,25 e a economia pagando no PIX.*
+
+![Endereço da loja](examples/chat_03_endereco.png)
+
+*Figura 3. Pergunta respondida com os dados da ficha da loja.*
+
+![Pedido atrasado](examples/chat_04_pedido_atrasado.png)
+
+*Figura 4. Consulta de pedido com e-mail informado: rastreio, previsão vencida e oferta de encaminhar o caso à equipe.*
+
+![Tentativa de manipulação](examples/chat_05_manipulacao.png)
+
+*Figura 5. Pedido de desconto com instrução para ignorar as regras: o agente recusa e volta ao atendimento.*
+
 Cada arquivo é uma única execução de um modelo não determinístico, sem edição das respostas, gerada com a versão final do agente. O cenário 03 foi gerado duas vezes: na primeira, a correção automática de promoção incompleta fez o Riff repetir a resposta do turno anterior em vez de responder à pergunta sobre o PIX. O aviso enviado ao modelo nessa correção foi reescrito para exigir a resposta à pergunta atual, e a segunda execução é a mantida. O cenário 05 também foi gerado duas vezes: na primeira, o Riff afirmou que a loja tinha violões "novos ou usados", informação ausente dos dados. Nenhuma das primeiras execuções foi guardada, e as duas ocorrências ilustram o tipo de falha que a avaliação da seção 6 mede de forma agregada. Uma terceira falha, descoberta ao revisar o exemplo 04, levou à validação de credenciais descrita na seção 3.5: o modelo havia consultado o pedido com o e-mail e o telefone da loja no lugar dos do cliente.
 
 ## 8. Limitações conhecidas e trabalhos futuros

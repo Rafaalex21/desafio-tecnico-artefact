@@ -40,6 +40,9 @@ tr { page-break-inside: avoid; }
 th, td { border: 1px solid #d0d7de; padding: 4px 7px; vertical-align: top; text-align: left;
   overflow-wrap: break-word; }
 th { background: #f0f3f6; }
+img { display: block; max-width: 88%; margin: 10px auto 4px; border: 1px solid #d0d7de; border-radius: 6px;
+  page-break-inside: avoid; }
+em { color: #57606a; }
 pre.mermaid { background: #fff; border: none; text-align: center; white-space: pre; }
 """
 
@@ -59,6 +62,11 @@ def converter(texto: str) -> str:
         lambda m: f'<pre class="mermaid">{m.group(1)}</pre>',
         corpo,
         flags=re.DOTALL,
+    )
+    corpo = re.sub(
+        r'src="(?!https?:|file:)([^"]+)"',
+        lambda m: f'src="{(RAIZ / m.group(1)).as_uri()}"',
+        corpo,
     )
     return re.sub(
         r'href="(?!https?:|#|mailto:)([^"]+)"',
