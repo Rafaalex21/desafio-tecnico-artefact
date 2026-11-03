@@ -339,7 +339,7 @@ Parâmetros: `topicos` (lista de 1 a 3 itens do enum abaixo).
 | `garantia` | 8, 8.1 a 8.3 |
 | `privacidade` | 9 |
 
-As seções 7 (procedimentos internos de atendimento) e 10 (disposições finais) não são expostas: o conteúdo delas está compilado no system prompt como regra de comportamento.
+O texto servido já traz as decisões T11 (e-mail sem acento, telefone com espaço) e T12 (a tabela de pagamentos remete à seção 3.1 em vez de fixar R$ 100,00); o campo `correcoes` de `politicas.json` registra cada troca. As seções 7 (procedimentos internos de atendimento) e 10 (disposições finais) não são expostas: o conteúdo delas está compilado no system prompt como regra de comportamento.
 
 Saída: `{secoes: [{numero, titulo, texto}]}` com o texto em markdown, tabelas preservadas.
 
@@ -481,6 +481,7 @@ AGORA_REFERENCIA=2026-03-25T10:30:00-04:00 # vazio = relógio real
 HISTORY_MAX_TOKENS=6000
 DB_PATH=data/processed/emporio.db
 CONVERSAS_DB_PATH=data/processed/conversas.db
+POLITICAS_PATH=data/processed/politicas.json
 HANDOFF_PATH=data/processed/handoff.jsonl
 ```
 
