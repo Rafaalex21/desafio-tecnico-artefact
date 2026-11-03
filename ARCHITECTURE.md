@@ -570,6 +570,14 @@ Uma execução de cada configuração, com o prompt final e temperatura 0,3 (rel
 
 Escolhido o Qwen3-14B com raciocínio (padrão do `.env.example`). A configuração mais rápida segue disponível por `LLM_EXTRA_BODY`. A variação entre execuções é de um ou dois casos; o caso ped-07 teve a redação dos turnos ajustada após a primeira execução e o comparador passou a tratar hifens tipográficos como hífen; ambos os ajustes estão declarados no README (seção 6.2).
 
+### 13.5 Testes end-to-end
+`tests/e2e/` (pytest-playwright, marcador `e2e`, fora da execução padrão do `pytest`). O servidor é o de produção com `criar_app`; só o LLM é trocado por `LLMDeRoteiro`, que escolhe a ferramenta por palavras-chave e redige a resposta com os dados das ferramentas reais. Seletores por papel, rótulo e texto visível, sem esperas fixas. Um fluxo marcado `real` usa o modelo local (`E2E_MODELO_REAL=1`). Navegador: Edge instalado (`E2E_CANAL`), sem baixar binários; vídeo desligado pelo mesmo motivo.
+
+Comando e artefatos (`e2e-report/index.html`, `results.json`, traces e capturas nas falhas):
+```
+uv run pytest tests/e2e -m e2e --html=e2e-report/index.html --self-contained-html --json-report --json-report-file=e2e-report/results.json --tracing retain-on-failure --screenshot only-on-failure --output e2e-report/artefatos
+```
+
 ## 14. Estrutura do repositório
 
 ```
@@ -689,7 +697,7 @@ Commit final: `docs(exemplos): conversas geradas com data de referência fixa`.
 Seções: 11, 13.
 - Usar a skill `e2e-first-testing` (Playwright como mecanismo principal) para exercitar o produto pronto, a partir da tela de chat.
 - Fluxos mínimos: abertura com boas-vindas e selo da loja; clique em uma sugestão; pergunta de preço com a linha de status; recarregar e ver a conversa restaurada; "Nova conversa"; largura de 360 px sem rolagem horizontal; erro do servidor de modelos tratado na tela.
-- Rodar os fluxos com um LLM roteirizado (determinístico) e, ao menos uma vez, com o modelo real.
+- Rodar os fluxos com um LLM de roteiro (determinístico) e, ao menos uma vez, com o modelo real (seção 13.5).
 - Rodar também `uv run emporio-chat` e `uv run emporio-evals --so <casos>` como verificação de fumaça.
 - Corrigir o que aparecer; manter testes unitários apenas onde pegam bug que o E2E não pega.
 

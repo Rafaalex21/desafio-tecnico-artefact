@@ -91,6 +91,15 @@ uv run pytest
 uv run emporio-evals --modelo qwen3-14b --rotulo qwen3-14b-com-raciocinio --saida evals/reports
 ```
 
+Testes de ponta a ponta da tela de chat, com navegador real (Playwright). Eles usam o Edge ou o Chrome já instalado; para usar o Chromium do Playwright, rode `uv run playwright install chromium` e defina `E2E_CANAL=` vazio. O relatório HTML, o `results.json` e, em caso de falha, traces e capturas ficam em `e2e-report/`. O segundo comando troca o nome da conta local, que o pytest grava nos caminhos, antes de o relatório ser versionado:
+
+```bash
+uv run pytest tests/e2e -m e2e --html=e2e-report/index.html --self-contained-html --json-report --json-report-file=e2e-report/results.json --tracing retain-on-failure --screenshot only-on-failure --output e2e-report/artefatos
+uv run python scripts/anonimizar_relatorio_e2e.py
+```
+
+Para repetir um fluxo contra o modelo local de verdade, defina `E2E_MODELO_REAL=1` com o servidor de modelos ligado e rode `uv run pytest tests/e2e -m "e2e and real"`.
+
 ### 2.4 Configuração
 
 | Variável | Padrão | Descrição |
@@ -234,6 +243,14 @@ Na execução final, os novos guardrails resolveram as falhas que motivaram sua 
 Dois ajustes foram feitos nos próprios casos após a primeira execução, e ambos são declarados aqui. O caso ped-07, que testa o bloqueio após três verificações malsucedidas, passou a repetir, em cada tentativa, a mesma frase completa com um e-mail diferente, pois a versão inicial, com mensagens curtas como "tente com teste2", levava o modelo a responder sem chamar a ferramenta. Mesmo com a nova redação, o Qwen3-14B com raciocínio reproduziu a mensagem de falha na terceira tentativa sem consultar o pedido, de modo que o bloqueio não chegou a ser acionado e a quarta tentativa, com o e-mail correto, foi atendida. A falha desse caso mostra que o contador de tentativas depende de o modelo chamar a ferramenta. Além disso, o comparador de texto passou a tratar hifens tipográficos como hífen comum, porque o gpt-oss-20b os emite em nomes de produto ("GF‑3D"), o que reprovava respostas corretas.
 
 Os relatórios de cada execução estão em `evals/reports/`; a execução final do Qwen3-14B é `qwen3-14b-com-raciocinio-g6-g7`. Por fim, os casos foram escritos pelo próprio autor, que conhecia as armadilhas dos dados, e cada um é executado uma única vez por configuração. Os números servem para comparar configurações e detectar regressões, não como estimativa de desempenho em atendimentos reais.
+
+### 6.3 Testes de ponta a ponta
+
+A tela de chat é exercitada em um navegador real por 14 fluxos determinísticos e um fluxo com o modelo local, em `tests/e2e/`. Nos fluxos determinísticos, o sistema é o de produção (servidor, ferramentas, banco, guardrails e tela) e só o servidor de modelos é substituído por um roteiro que escolhe a ferramenta por palavras-chave, de modo que o resultado não depende da variação do modelo. Os fluxos cobrem a abertura com boas-vindas e selo da loja, o clique em sugestão, o envio por Enter e a quebra de linha por Shift+Enter, a mensagem vazia, o modo bastidores, a restauração da conversa ao recarregar, inclusive no meio de um turno, a nova conversa, HTML na pergunta e na resposta exibido como texto, falha do servidor de modelos, servidor da tela fora do ar e largura de 360 px sem rolagem horizontal.
+
+Na primeira execução, 12 dos 14 fluxos passaram. Uma falha era do próprio teste, que localizava o selo da loja pelo atributo de título, alterado pela tela; o seletor foi trocado pelo texto visível. A outra era um defeito real: ao recarregar a página no meio de um turno, a mensagem do cliente ainda não estava gravada e a tela voltava às boas-vindas, perdendo a resposta. O servidor passou a informar o turno em andamento, e a tela passou a exibir a pergunta e a aguardar a resposta. Depois da correção, os 14 fluxos passaram em 26 segundos. O fluxo com o modelo real (Qwen3-14B) também passou, e as verificações de fumaça de `emporio-chat` e de dois casos de `emporio-evals` funcionaram.
+
+Fica sem cobertura automatizada a verificação visual dos temas escuro e claro, que foi feita manualmente, e os navegadores Firefox e Safari. A gravação de vídeo das falhas foi desligada para não baixar o ffmpeg do Playwright; traces e capturas bastam para o diagnóstico. O relatório da última execução está em `e2e-report/index.html`.
 
 ## 7. Exemplos de interação
 

@@ -31,3 +31,6 @@ desafio_tecnico_ai_eng_artefact.pdf
 
 # Estado local do Claude Code
 .claude/
+
+# Artefatos pesados dos testes end-to-end (o relatório HTML e o JSON são versionados)
+e2e-report/artefatos/

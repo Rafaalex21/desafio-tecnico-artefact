@@ -20,7 +20,11 @@ dependencies = [
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "playwright>=1.64.1",
     "pytest",
+    "pytest-html>=4.2.0",
+    "pytest-json-report>=1.5.0",
+    "pytest-playwright>=0.10.0",
     "ruff",
 ]
 
@@ -41,6 +45,11 @@ packages = ["src/emporio"]
 testpaths = ["tests"]
 pythonpath = ["src"]
 filterwarnings = ["ignore::pytest.PytestUnhandledThreadExceptionWarning"]
+addopts = "-m 'not e2e'"
+markers = [
+    "e2e: fluxos da tela de chat com navegador real (rodar com -m e2e)",
+    "real: usa o modelo local de verdade (exige E2E_MODELO_REAL=1)",
+]
 
 [tool.ruff]
 line-length = 120
